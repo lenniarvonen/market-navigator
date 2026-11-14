@@ -1,68 +1,82 @@
 "use client";
 
-// A draggable orthographic globe with one marker per entity. Flat land on a midnight sea, no glow:
-// the markers are the only colour on it. Drag (or arrow keys) to turn it; it turns slowly on its
-// own at rest unless the visitor prefers reduced motion.
-import { useEffect, useRef } from "react";
+// A draggable orthographic globe: coastlines drawn as thin light lines on a midnight sea, one
+// marker per entity. Drag, arrow keys or the controls turn it; it turns slowly on its own at rest
+// unless the visitor prefers reduced motion.
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { geoDistance, geoGraticule10, geoOrthographic, geoPath } from "d3-geo";
 import { LAND, type LonLat } from "@/lib/geo";
 
-export type MarkerKind = "startup" | "invention" | "investor" | "acquirer";
-export type GlobeMarker = { id: string; kind: MarkerKind; name: string; place?: string; at: LonLat };
-/** A connection drawn as a great-circle arc: an investor to a startup it backed, a buyer to a startup it bought. */
-export type GlobeLink = { id: string; kind: "investor" | "acquirer"; from: LonLat; to: LonLat; ends: [string, string] };
+export type MarkerKind = "startup" | "investor" | "invention" | "acquirer";
+export type GlobeMarker = { id: string; kind: MarkerKind | "you"; name: string; place?: string; at: LonLat };
+/** A connection drawn as a great-circle arc between two markers. */
+export type GlobeLink = { id: string; kind: "investor" | "acquirer" | "you"; from: LonLat; to: LonLat; ends: [string, string] };
+/** Imperative controls for the buttons under the globe. */
+export type GlobeControl = { turn: (deg: number) => void; zoom: (by: number) => void; flyTo: (at: LonLat) => void };
 
 export const KIND_LABEL: Record<MarkerKind, string> = {
-  startup: "Startup",
-  invention: "Invention",
-  investor: "Investor",
-  acquirer: "Acquirer",
+  startup: "Competitor",
+  investor: "Early investor",
+  invention: "Innovation",
+  acquirer: "Potential acquirer",
+};
+export const KIND_PLURAL: Record<MarkerKind, string> = {
+  startup: "Competitors",
+  investor: "Early investors",
+  invention: "Innovations",
+  acquirer: "Potential acquirers",
 };
 
-/** One glyph per kind, used on the globe, in the legend and next to names in the sections. */
-export function Glyph({ kind, size = 14 }: { kind: MarkerKind; size?: number }) {
+/** One glyph per kind, used on the globe, in the layer list and next to names in the report. */
+export function Glyph({ kind, size = 14 }: { kind: MarkerKind | "you"; size?: number }) {
   const common = { className: `glyph ${kind}`, width: size, height: size, viewBox: "0 0 16 16", "aria-hidden": true } as const;
   switch (kind) {
     case "startup":
       return <svg {...common}><circle cx="8" cy="8" r="5.5" /></svg>;
     case "investor":
-      return <svg {...common}><rect x="3" y="3" width="10" height="10" rx="1.5" /></svg>;
-    case "acquirer":
-      return <svg {...common}><path d="M8 2.5 14 13.5H2Z" /></svg>;
-    case "invention":
       return <svg {...common}><path d="M8 1.8 14.2 8 8 14.2 1.8 8Z" /></svg>;
+    case "acquirer":
+      return <svg {...common}><rect x="2.75" y="2.75" width="10.5" height="10.5" rx="1.5" /></svg>;
+    case "invention":
+      return <svg {...common}><path d="M8 2.2 14.2 13.3H1.8Z" /></svg>;
+    case "you":
+      return <svg {...common}><circle cx="8" cy="8" r="5" /></svg>;
   }
 }
 
 type Props = {
   markers: GlobeMarker[];
   links?: GlobeLink[];
-  /** Marker id to light up (a hovered row below), plus its links. */
+  /** Marker id lit by a hover elsewhere on the page. */
   active?: string;
-  /** Show startup names next to their markers. */
-  labels?: boolean;
-  /** Turn the globe to this point (changes when a new map arrives). */
+  /** Marker id shown as selected (ring and name). */
+  selected?: string;
+  /** Turn the globe to this point when it changes. */
   focus?: LonLat;
   /** Slow turn at rest. */
   spin: boolean;
+  control?: MutableRefObject<GlobeControl | null>;
   onSelect?: (m: GlobeMarker) => void;
-  /** A marker was hovered or focused (undefined when it is left). */
   onHover?: (id?: string) => void;
+  /** Ids of the markers on the visible face, reported when the set changes. */
+  onView?: (ids: string[]) => void;
 };
 
 const SPIN_DEG_PER_MS = 0.004;
-const FLY_MS = 1400;
+const FLY_MS = 1200;
 
-export default function Globe({ markers, links = [], active, labels = false, focus, spin, onSelect, onHover }: Props) {
+export default function Globe({ markers, links = [], active, selected, focus, spin, control, onSelect, onHover, onView }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const sea = useRef<SVGCircleElement>(null);
+  const rim = useRef<SVGCircleElement>(null);
   const land = useRef<SVGPathElement>(null);
+  const grid = useRef<SVGPathElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const pins = useRef(new Map<string, HTMLButtonElement>());
   const arcs = useRef(new Map<string, SVGPathElement>());
-  const grid = useRef<SVGPathElement>(null);
   const st = useRef({
     rot: [-15, -35, 0] as [number, number, number], // starts over the Nordics
+    zoom: 1,
     size: 0,
     dragging: false,
     last: [0, 0] as [number, number],
@@ -73,27 +87,55 @@ export default function Globe({ markers, links = [], active, labels = false, foc
     spin,
     markers,
     links,
+    view: "",
+    onView,
   });
   st.current.spin = spin;
   st.current.markers = markers;
   st.current.links = links;
+  st.current.onView = onView;
   st.current.dirty = true;
 
-  // Fly to a new focus point.
-  useEffect(() => {
-    if (!focus) return;
+  const flyTo = (at: LonLat) => {
     const s = st.current;
-    const to: [number, number] = [-focus[0], Math.max(-60, Math.min(60, -focus[1]))];
+    const to: [number, number] = [-at[0], Math.max(-60, Math.min(60, -at[1]))];
+    s.idleUntil = performance.now() + 8000;
     if (s.reduced) {
       s.rot = [to[0], to[1], 0];
       s.dirty = true;
       return;
     }
-    // Take the short way round.
-    let from0 = s.rot[0];
+    let from0 = s.rot[0]; // take the short way round
     while (from0 - to[0] > 180) from0 -= 360;
     while (to[0] - from0 > 180) from0 += 360;
     s.fly = { from: [from0, s.rot[1]], to, t0: performance.now() };
+  };
+
+  const turn = (dx: number, dy: number) => {
+    const s = st.current;
+    const k = 180 / Math.max(200, s.size * s.zoom); // a drag across the globe turns it about 180 degrees
+    s.rot = [s.rot[0] + dx * k, Math.max(-80, Math.min(80, s.rot[1] - dy * k)), 0];
+    s.fly = undefined;
+    s.idleUntil = performance.now() + 8000;
+    s.dirty = true;
+  };
+
+  if (control)
+    control.current = {
+      turn: (deg) => {
+        const s = st.current;
+        flyTo([-(s.rot[0] + deg), -s.rot[1]]);
+      },
+      zoom: (by) => {
+        const s = st.current;
+        s.zoom = Math.max(1, Math.min(3.2, s.zoom * by));
+        s.dirty = true;
+      },
+      flyTo,
+    };
+
+  useEffect(() => {
+    if (focus) flyTo(focus);
   }, [focus?.[0], focus?.[1]]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -108,7 +150,7 @@ export default function Globe({ markers, links = [], active, labels = false, foc
     const graticule = geoGraticule10();
 
     const ro = new ResizeObserver(([e]) => {
-      s.size = e.contentRect.width;
+      s.size = Math.min(e.contentRect.width, e.contentRect.height);
       s.dirty = true;
     });
     if (wrap.current) ro.observe(wrap.current);
@@ -128,37 +170,39 @@ export default function Globe({ markers, links = [], active, labels = false, foc
         s.rot = [s.rot[0] + dt * SPIN_DEG_PER_MS, s.rot[1], 0];
         s.dirty = true;
       }
-      if (s.dirty && s.size > 0) {
+      if (s.dirty && s.size > 0 && wrap.current) {
         s.dirty = false;
-        const r = s.size / 2;
-        projection.scale(r - 1).translate([r, r]).rotate(s.rot);
-        sea.current?.setAttribute("r", String(r - 1));
-        sea.current?.setAttribute("cx", String(r));
-        sea.current?.setAttribute("cy", String(r));
+        const w = wrap.current.clientWidth, h = wrap.current.clientHeight;
+        const r = (s.size / 2 - 2) * s.zoom;
+        projection.scale(r).translate([w / 2, h / 2]).rotate(s.rot);
+        for (const c of [sea.current, rim.current]) {
+          c?.setAttribute("r", String(r));
+          c?.setAttribute("cx", String(w / 2));
+          c?.setAttribute("cy", String(h / 2));
+        }
         land.current?.setAttribute("d", path(LAND as Parameters<typeof path>[0]) ?? "");
         grid.current?.setAttribute("d", path(graticule) ?? "");
         for (const l of s.links) arcs.current.get(l.id)?.setAttribute("d", path({ type: "LineString", coordinates: [l.from, l.to] }) ?? "");
         const centre: [number, number] = [-s.rot[0], -s.rot[1]];
-        const boxes: [number, number, number][] = []; // shown labels: x, y, width
+        const seen: string[] = [];
         for (const m of s.markers) {
           const el = pins.current.get(m.id);
           if (!el) continue;
           const front = geoDistance(m.at, centre) < Math.PI / 2 - 0.03;
           const p = projection(m.at);
-          if (!front || !p) {
+          const inside = p && p[0] > -8 && p[0] < w + 8 && p[1] > -8 && p[1] < h + 8;
+          if (!front || !p || !inside) {
             el.style.visibility = "hidden";
             continue;
           }
+          seen.push(m.id);
           el.style.visibility = "visible";
           el.style.transform = `translate(${p[0]}px, ${p[1]}px)`;
-          // Names that would overlap an earlier (better funded) name are hidden; the tooltip still has them.
-          const label = el.querySelector<HTMLElement>(".label");
-          if (label) {
-            const w = m.name.length * 7.5 + 12;
-            const clash = boxes.some(([x, y, bw]) => Math.abs(y - p[1]) < 18 && p[0] < x + bw && x < p[0] + w);
-            label.classList.toggle("hidden", clash);
-            if (!clash) boxes.push([p[0], p[1], w]);
-          }
+        }
+        const key = seen.join("|");
+        if (key !== s.view) {
+          s.view = key;
+          s.onView?.(seen);
         }
       }
       raf = requestAnimationFrame(frame);
@@ -171,15 +215,7 @@ export default function Globe({ markers, links = [], active, labels = false, foc
     };
   }, []);
 
-  const turn = (dx: number, dy: number) => {
-    const s = st.current;
-    const k = 180 / Math.max(200, s.size); // a drag across the globe turns it about 180 degrees
-    s.rot = [s.rot[0] + dx * k, Math.max(-80, Math.min(80, s.rot[1] - dy * k)), 0];
-    s.fly = undefined;
-    s.idleUntil = performance.now() + 5000;
-    s.dirty = true;
-  };
-
+  const lit = active ?? selected;
   return (
     <div className="globe" ref={wrap}>
       <svg
@@ -216,10 +252,11 @@ export default function Globe({ markers, links = [], active, labels = false, foc
         <circle ref={sea} className="sea" />
         <path ref={grid} className="graticule" />
         <path ref={land} className="land" />
+        <circle ref={rim} className="rim" />
         {links.map((l) => (
           <path
             key={l.id}
-            className={`arc ${l.kind}${active && l.ends.includes(active) ? " on" : ""}${active && !l.ends.includes(active) ? " off" : ""}`}
+            className={`arc ${l.kind}${lit && l.ends.includes(lit) ? " on" : ""}${lit && !l.ends.includes(lit) && l.kind !== "you" ? " off" : ""}`}
             ref={(el) => {
               if (el) arcs.current.set(l.id, el);
               else arcs.current.delete(l.id);
@@ -228,31 +265,38 @@ export default function Globe({ markers, links = [], active, labels = false, foc
         ))}
       </svg>
       <div className="pins">
-        {markers.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={`pin ${m.kind}${active === m.id ? " on" : ""}${labels && m.kind === "startup" ? " labelled" : ""}`}
-            ref={(el) => {
-              if (el) pins.current.set(m.id, el);
-              else pins.current.delete(m.id);
-            }}
-            style={{ visibility: "hidden" }}
-            aria-label={`${KIND_LABEL[m.kind]}: ${m.name}${m.place ? `, ${m.place}` : ""}`}
-            onClick={() => onSelect?.(m)}
-            onMouseEnter={() => onHover?.(m.id)}
-            onMouseLeave={() => onHover?.(undefined)}
-            onFocus={() => onHover?.(m.id)}
-            onBlur={() => onHover?.(undefined)}
-          >
-            <Glyph kind={m.kind} />
-            {labels && m.kind === "startup" && <span className="label" aria-hidden>{m.name}</span>}
-            <span className="tip" role="presentation">
-              {m.name}
-              <small>{KIND_LABEL[m.kind]}{m.place ? ` · ${m.place}` : ""}</small>
-            </span>
-          </button>
-        ))}
+        {markers.map((m) => {
+          const named = m.kind === "you" || selected === m.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              className={`pin ${m.kind}${active === m.id ? " on" : ""}${selected === m.id ? " sel" : ""}`}
+              ref={(el) => {
+                if (el) pins.current.set(m.id, el);
+                else pins.current.delete(m.id);
+              }}
+              style={{ visibility: "hidden" }}
+              aria-label={`${m.kind === "you" ? "You" : KIND_LABEL[m.kind]}: ${m.name}${m.place ? `, ${m.place}` : ""}`}
+              aria-pressed={m.kind === "you" ? undefined : selected === m.id}
+              onClick={() => onSelect?.(m)}
+              onMouseEnter={() => onHover?.(m.id)}
+              onMouseLeave={() => onHover?.(undefined)}
+              onFocus={() => onHover?.(m.id)}
+              onBlur={() => onHover?.(undefined)}
+            >
+              <Glyph kind={m.kind} />
+              {named ? (
+                <span className="chip" aria-hidden>{m.kind === "you" ? "You" : m.name}</span>
+              ) : (
+                <span className="tip" role="presentation">
+                  {m.name}
+                  <small>{KIND_LABEL[m.kind as MarkerKind]}{m.place ? ` · ${m.place}` : ""}</small>
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

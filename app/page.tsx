@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { Acquirer, MarketMap, MoatSignal, Momentum, Peer, Source } from "@/lib/types";
+import type { Acquirer, Investor, MarketMap, MoatSignal, Momentum, Peer, Source } from "@/lib/types";
 import { fmtEur } from "@/lib/util";
 import { centreOf, jitter, locate, type LonLat } from "@/lib/geo";
-import { Glyph, KIND_LABEL, type GlobeLink, type GlobeMarker, type MarkerKind } from "./Globe";
+import { Glyph, KIND_LABEL, KIND_PLURAL, type GlobeControl, type GlobeLink, type GlobeMarker, type MarkerKind } from "./Globe";
 
-// The globe measures the window and runs an animation loop, so it renders on the client only.
+// The globe measures its box and runs an animation loop, so it renders on the client only.
 const Globe = dynamic(() => import("./Globe"), { ssr: false, loading: () => <div className="globe" /> });
 
 const EXAMPLES = ["AI agents for customer support", "Carbon accounting for SMEs", "AI tools for dental clinics", "B2B payments for freelancers"];
-const KINDS: MarkerKind[] = ["startup", "invention", "investor", "acquirer"];
+const KINDS: MarkerKind[] = ["startup", "investor", "invention", "acquirer"];
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const anchor = (kind: MarkerKind, name: string) => `e-${kind}-${slug(name)}`;
@@ -21,21 +21,26 @@ type Phase = "rest" | "finding" | "reading" | "done";
 export default function Home() {
   const [idea, setIdea] = useState("");
   const [company, setCompany] = useState("");
+  const [asked, setAsked] = useState({ idea: "", company: "" });
   const [map, setMap] = useState<MarketMap | null>(null);
   const [preview, setPreview] = useState<Peer[] | null>(null);
   const [err, setErr] = useState("");
   const [phase, setPhase] = useState<Phase>("rest");
   const [active, setActive] = useState<string | undefined>();
-  const [pick, setPick] = useState<LonLat | undefined>();
+  const [selected, setSelected] = useState<string | undefined>();
+  const [layers, setLayers] = useState<Record<MarkerKind, boolean>>({ startup: true, investor: true, invention: true, acquirer: true });
+  const [inView, setInView] = useState<string[]>([]);
+  const control = useRef<GlobeControl | null>(null);
   const loading = phase === "finding" || phase === "reading";
 
   async function run(i: string, c = company) {
     if (!i.trim() && !c.trim()) return;
     setIdea(i);
+    setAsked({ idea: i.trim(), company: c.trim() });
     setErr("");
     setMap(null);
     setPreview(null);
-    setPick(undefined);
+    setSelected(undefined);
     setActive(undefined);
     setPhase("finding");
     let gotPeers = false;
@@ -81,10 +86,18 @@ export default function Home() {
 
   const peers = map?.peers ?? preview ?? [];
   const markers = useMemo(() => buildMarkers(peers, map), [peers, map]);
-  const links = useMemo(() => buildLinks(markers, map), [markers, map]);
+  const shown = useMemo(() => markers.filter((m) => m.kind === "you" || layers[m.kind]), [markers, layers]);
+  const you = markers.find((m) => m.kind === "you");
+  const sel = markers.find((m) => m.id === selected);
+  const links = useMemo(() => {
+    const ids = new Set(shown.map((m) => m.id));
+    const out = buildLinks(markers, map).filter((l) => l.ends.every((e) => ids.has(e)));
+    if (you && sel && sel.kind !== "you") out.push({ id: "you-link", kind: "you", from: you.at, to: sel.at, ends: [you.id, sel.id] });
+    return out;
+  }, [markers, map, shown, you, sel]);
   const home = useMemo<LonLat | undefined>(
-    () => centreOf(markers.filter((m) => m.kind === "startup").map((m) => m.at)),
-    [markers],
+    () => you?.at ?? centreOf(markers.filter((m) => m.kind === "startup").map((m) => m.at)),
+    [markers, you],
   );
   const counts = useMemo(
     () => Object.fromEntries(KINDS.map((k) => [k, markers.filter((m) => m.kind === k).length])) as Record<MarkerKind, number>,
@@ -92,18 +105,30 @@ export default function Home() {
   );
   const startups = peers.filter((p) => !p.isTarget).length;
   const atRest = phase === "rest";
-  const ids = useMemo(() => new Set(markers.map((m) => m.id)), [markers]);
 
-  /** A row below was hovered or focused: light its marker and arcs. */
+  // Open each map with its best-funded placed competitor selected, as a worked example.
+  useEffect(() => {
+    if (map && !selected) setSelected(markers.find((m) => m.kind === "startup")?.id);
+  }, [map]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ids = useMemo(() => new Set(markers.map((m) => m.id)), [markers]);
+  /** A report row was hovered or focused: light its marker and arcs. */
   const hover = (kind: MarkerKind, name?: string) => setActive(name && ids.has(`${kind}:${name}`) ? `${kind}:${name}` : undefined);
-  /** A row below was clicked: turn the globe to its marker. */
+  /** A report row was clicked: select its marker and turn the globe to it. */
   const show = (kind: MarkerKind, name: string) => {
     const m = markers.find((x) => x.id === `${kind}:${name}`);
-    if (m) setPick([m.at[0], m.at[1]]);
+    if (m) choose(m);
   };
-  const rows: RowEvents = { hover, show, active };
+  const rows: RowEvents = { hover, show, active: active ?? selected };
 
-  function select(m: GlobeMarker) {
+  function choose(m: GlobeMarker) {
+    if (m.kind === "you") return;
+    setSelected(m.id);
+    control.current?.flyTo(m.at);
+  }
+
+  function toReport(m: GlobeMarker) {
+    if (m.kind === "you") return;
     const el = document.getElementById(anchor(m.kind, m.name));
     if (!el) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -121,90 +146,212 @@ export default function Home() {
     setPhase("rest");
     setErr("");
     setActive(undefined);
+    setSelected(undefined);
   }
 
-  const form = (compact: boolean) => (
-    <form className={`search${compact ? " compact" : ""}`} role="search" onSubmit={(e) => { e.preventDefault(); run(idea); }}>
-      <label className="field idea">
-        <span className="sr-only">Your idea</span>
-        <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder={compact ? "Map another idea" : "Your idea, e.g. payroll for restaurants"} />
-      </label>
-      {!compact && (
-        <label className="field company">
-          <span className="sr-only">Your company, optional</span>
-          <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Your company (optional)" />
-        </label>
-      )}
-      <button className="go" disabled={loading}>{loading ? "Mapping" : compact ? "Map" : "Map my market"}</button>
-    </form>
-  );
+  const visible = inView.map((id) => markers.find((m) => m.id === id)).filter((m): m is GlobeMarker => !!m && m.kind !== "you");
+  const title = asked.idea || asked.company || map?.input.idea || "";
 
   return (
     <>
-      <header className={`bar${atRest ? "" : " docked"}`}>
+      <header className="bar">
         <a className="wordmark" href="/" onClick={(e) => { e.preventDefault(); reset(); }}>
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden><circle cx="9" cy="9" r="7.25" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M1.75 9h14.5M9 1.75c2.2 2 3.1 4.4 3.1 7.25S11.2 14.25 9 16.25M9 1.75C6.8 3.75 5.9 6.15 5.9 9S6.8 14.25 9 16.25" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
-          Market Navigator
+          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden><circle cx="11" cy="11" r="9.25" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M1.75 11h18.5M11 1.75c2.7 2.5 3.9 5.6 3.9 9.25S13.7 17.75 11 20.25M11 1.75C8.3 4.25 7.1 7.35 7.1 11s1.2 6.75 3.9 9.25" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>
+          <span>Market Navigator</span>
         </a>
-        {!atRest && form(true)}
-        <span className="bar-note">Built on Cala&rsquo;s company graph</span>
+        {!atRest && (
+          <form className="top-search" role="search" onSubmit={(e) => { e.preventDefault(); run(idea); }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="m11 11 3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+            <label className="sr-only" htmlFor="top-q">Map another idea</label>
+            <input id="top-q" value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Map another idea, e.g. payroll for restaurants" />
+          </form>
+        )}
+        <div className="bar-end">
+          {!atRest && asked.company && <span className="you-chip">Your startup · {asked.company}{you?.place ? ` · ${you.place}` : ""}</span>}
+          {map && <span className="badge">{map.mode === "demo" ? "Sample data" : "Cala data"}</span>}
+          {atRest && <span className="bar-note">Built on Cala&rsquo;s company graph</span>}
+        </div>
       </header>
 
-      <div className={`stage ${atRest ? "at-rest" : "has-map"}`}>
-        <aside className="sky" aria-label="Globe of the companies found">
-          <Globe
-            markers={markers}
-            links={links}
-            active={active}
-            labels={!atRest}
-            focus={pick ?? home}
-            spin={atRest || phase === "finding"}
-            onSelect={select}
-            onHover={setActive}
-          />
-          {!atRest && (
-            <div className="key">
-              <ul className="legend" aria-label="Legend">
-                {KINDS.filter((k) => k !== "invention" || counts.invention > 0).map((k) => (
-                  <li key={k} className={counts[k] ? "" : "none"}>
+      <div className={atRest ? "hero" : "app"}>
+        {!atRest && (
+          <aside className="side" aria-label="Layers and companies in view">
+            <h2 className="side-h">Layers</h2>
+            <ul className="layers">
+              {KINDS.map((k) => (
+                <li key={k}>
+                  <label className={`layer${counts[k] ? "" : " empty"}`}>
                     <Glyph kind={k} />
-                    {KIND_LABEL[k]}s <span className="count">{counts[k]}</span>
-                  </li>
-                ))}
-              </ul>
-              {startups > counts.startup && <p className="key-note">{startups - counts.startup} of {startups} startups have no known HQ, so they are listed but not placed.</p>}
+                    <span className="layer-name">{KIND_PLURAL[k]}</span>
+                    <span className="layer-count">{counts[k]}</span>
+                    <input type="checkbox" checked={layers[k]} disabled={!counts[k]} onChange={(e) => setLayers({ ...layers, [k]: e.target.checked })} />
+                    <span className="check" aria-hidden />
+                  </label>
+                </li>
+              ))}
+            </ul>
+            {startups > counts.startup && <p className="side-note">{startups - counts.startup} of {startups} competitors have no known HQ. They are in the report below, not on the globe.</p>}
+            <div className="side-h row"><h2>In view</h2><span>{visible.length} of {shown.filter((m) => m.kind !== "you").length}</span></div>
+            <ul className="inview">
+              {visible.map((m) => (
+                <li key={m.id}>
+                  <button type="button" className={selected === m.id ? "sel" : ""} onClick={() => choose(m)} onMouseEnter={() => setActive(m.id)} onMouseLeave={() => setActive(undefined)}>
+                    <Glyph kind={m.kind} />
+                    <span className="iv-name">{m.name}</span>
+                    <span className="iv-place">{m.place}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
+
+        <section className="centre" aria-labelledby="map-h">
+          {atRest ? (
+            <div className="nav">
+              <h1 id="map-h">Who&rsquo;s already building your idea?</h1>
+              <p className="lede">Describe it in one line. Competitors, early investors and likely buyers light up on the globe. Every fact links to its source.</p>
+              <form className="search" onSubmit={(e) => { e.preventDefault(); run(idea); }}>
+                <label className="field idea">
+                  <span className="sr-only">Your idea</span>
+                  <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Your idea, e.g. payroll for restaurants" />
+                </label>
+                <label className="field company">
+                  <span className="sr-only">Your company, optional</span>
+                  <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Your company (optional)" />
+                </label>
+                <button className="go" disabled={loading}>Map my market</button>
+              </form>
+              <div className="examples">
+                <span className="examples-h">Try</span>
+                {EXAMPLES.map((x) => <button key={x} type="button" onClick={() => run(x, "")}>{x}</button>)}
+              </div>
+              {err && <p className="status error" role="alert">{err}</p>}
+            </div>
+          ) : (
+            <div className="centre-head">
+              <h1 id="map-h">{title}</h1>
+              <p className="hint">Drag the globe to turn it. Select a marker for details.</p>
             </div>
           )}
-        </aside>
-
-        {atRest ? (
-          <section className="nav" aria-labelledby="hero-h">
-            <h1 id="hero-h">Who&rsquo;s already building your idea?</h1>
-            <p className="lede">Describe it in one line. The startups doing it light up on the globe, with who funded them and who bought their rivals. Every fact links to its source.</p>
-            {form(false)}
-            <div className="examples">
-              <span className="examples-h">Try</span>
-              {EXAMPLES.map((x) => <button key={x} type="button" onClick={() => run(x, "")}>{x}</button>)}
-            </div>
-            {err && <p className="status error" role="alert">{err}</p>}
-          </section>
-        ) : (
-          <div className="feed">
-            <Status phase={phase} found={peers.length} err={err} />
-            {preview && !map && <PeersPreview peers={preview} rows={rows} />}
-            {map && <MapView map={map} rows={rows} />}
-            <footer className="foot">
-              <span>Company, funding, investor and deal data from Cala. Amounts in EUR at approximate rates.</span>
-            </footer>
+          <div className="globe-box">
+            <Globe
+              markers={shown}
+              links={links}
+              active={active}
+              selected={selected}
+              focus={home}
+              spin={atRest || phase === "finding"}
+              control={control}
+              onSelect={choose}
+              onHover={setActive}
+              onView={setInView}
+            />
           </div>
+          {!atRest && (
+            <>
+              <Status phase={phase} found={startups} err={err} />
+              <div className="controls" role="group" aria-label="Globe controls">
+                <div className="seg">
+                  <button type="button" aria-label="Turn west" onClick={() => control.current?.turn(-30)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+                  <button type="button" aria-label="Turn east" onClick={() => control.current?.turn(30)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+                </div>
+                <div className="seg">
+                  <button type="button" aria-label="Zoom out" onClick={() => control.current?.zoom(0.8)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><path d="M3 8h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg></button>
+                  <button type="button" aria-label="Zoom in" onClick={() => control.current?.zoom(1.25)}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><path d="M3 8h10M8 3v10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg></button>
+                </div>
+                <button type="button" className="seg solo" onClick={() => home && control.current?.flyTo(home)}>{you ? "Recenter on you" : "Recenter"}</button>
+              </div>
+            </>
+          )}
+        </section>
+
+        {!atRest && (
+          <aside className="detail" aria-label="Selected company" aria-live="polite">
+            {sel && sel.kind !== "you" ? (
+              <Detail m={sel} map={map} peers={peers} onCenter={() => control.current?.flyTo(sel.at)} onReport={() => toReport(sel)} />
+            ) : (
+              <div className="detail-empty">
+                <p>{loading ? "Placing the companies on the globe." : "Select a marker or a name on the left to see who it is, how much it raised and who backed it."}</p>
+              </div>
+            )}
+          </aside>
         )}
       </div>
+
+      {preview && !map && <PeersPreview peers={preview} rows={rows} />}
+      {map && <MapView map={map} rows={rows} />}
+
+      <footer className="foot">
+        <span>Company, funding, investor and deal data from Cala. Amounts in EUR at approximate rates.</span>
+      </footer>
     </>
   );
 }
 
+/** The right-hand panel: what the selected marker is, in a few sourced facts. */
+function Detail({ m, map, peers, onCenter, onReport }: { m: GlobeMarker; map: MarketMap | null; peers: Peer[]; onCenter: () => void; onReport: () => void }) {
+  const kind = m.kind as MarkerKind;
+  let rows: [string, string][] = [];
+  let about: string | undefined;
+  let why: string | undefined;
+  let sources: Source[] = [];
+  if (kind === "startup") {
+    const p = peers.find((x) => x.name === m.name);
+    about = p?.description;
+    sources = p?.sources ?? [];
+    const backers = map?.investors.list.filter((i) => i.peers.includes(m.name)).map((i) => i.name) ?? [];
+    rows = [
+      ["Raised", p?.fundingEur !== undefined ? fmtEur(p.fundingEur) : "Unknown"],
+      ...(p?.share !== undefined ? [["Share of capital", pct(p.share)] as [string, string]] : []),
+      ["Last round", p?.lastRound ?? "Unknown"],
+      ...(p?.foundedYear ? [["Founded", String(p.foundedYear)] as [string, string]] : []),
+      ...(p?.employees ? [["Team", teamBand(p.employees)] as [string, string]] : []),
+      ...(backers.length ? [["Backed by", backers.slice(0, 3).join(", ")] as [string, string]] : []),
+    ];
+    const gap = map?.standout.gaps.find((g) => g.peers.includes(m.name));
+    why = gap ? `${gap.title}. ${gap.detail.split(/(?<=[.!?])\s+(?=[A-Z])/)[0]}` : undefined;
+  } else if (kind === "investor") {
+    const i: Investor | undefined = map?.investors.list.find((x) => x.name === m.name);
+    sources = i?.sources ?? [];
+    rows = [
+      ["Backed here", i?.peers.join(", ") ?? "Unknown"],
+      ["Rounds joined", String(i?.rounds ?? 0)],
+    ];
+    if (i) why = `Has backed ${i.peers.length === 1 ? "one company" : `${i.peers.length} companies`} in this space, so it already knows the market you would pitch.`;
+  } else if (kind === "acquirer") {
+    const a: Acquirer | undefined = map?.acquirers.find((x) => x.name === m.name);
+    sources = a?.evidence.flatMap((e) => e.sources) ?? [];
+    rows = (a?.evidence ?? []).slice(0, 4).map((e, n) => [n === 0 ? "Evidence" : "", e.text]);
+  }
+  return (
+    <div className="detail-body">
+      <p className={`kicker ${kind}`}><Glyph kind={kind} size={12} />{KIND_LABEL[kind]}</p>
+      <h2 className="detail-name">{m.name}</h2>
+      {m.place && <p className="detail-place">{m.place}</p>}
+      {about && <p className="detail-about">{about}</p>}
+      <dl className="facts">
+        {rows.map(([k, v], n) => <div key={n}><dt>{k}</dt><dd>{v}</dd></div>)}
+      </dl>
+      {sources.length > 0 && <p className="detail-src">Sources <Sources sources={sources} /></p>}
+      {why && (
+        <div className="why">
+          <h3>Why it matters to you</h3>
+          <p>{why}</p>
+        </div>
+      )}
+      <div className="actions">
+        <button type="button" className="btn primary" onClick={onReport}>Show in the report</button>
+        <button type="button" className="btn" onClick={onCenter}>Center on globe</button>
+      </div>
+    </div>
+  );
+}
+
+const teamBand = (n: number) => (n <= 10 ? "1–10" : n <= 25 ? "11–25" : n <= 50 ? "26–50" : n <= 200 ? "51–200" : n <= 1000 ? "201–1,000" : "1,000+");
+
 type RowEvents = { hover: (kind: MarkerKind, name?: string) => void; show: (kind: MarkerKind, name: string) => void; active?: string };
-/** Hover, focus and click wiring for a row that has a marker on the globe. */
+/** Hover, focus and click wiring for a report row that has a marker on the globe. */
 const rowProps = (r: RowEvents, kind: MarkerKind, name: string) => ({
   onMouseEnter: () => r.hover(kind, name),
   onMouseLeave: () => r.hover(kind),
@@ -223,15 +370,17 @@ function Status({ phase, found, err }: { phase: Phase; found: number; err: strin
   return text ? <p className="status" role="status">{text}</p> : null;
 }
 
-/** Startups by HQ, investors and acquirers by their HQ when Cala knows it. */
+/** Competitors by HQ, investors and acquirers by their HQ when Cala knows it, and you. */
 function buildMarkers(peers: Peer[], map: MarketMap | null): GlobeMarker[] {
   const out: GlobeMarker[] = [];
-  const add = (kind: MarkerKind, name: string, place?: string) => {
+  const add = (kind: GlobeMarker["kind"], name: string, place?: string) => {
     const at = locate(place);
     if (!at) return;
-    out.push({ id: `${kind}:${name}`, kind, name, place, at: jitter(at, name) });
+    const shown = place?.replace(/, City of$/i, ""); // "London, City of" reads as London
+    out.push({ id: `${kind}:${name}`, kind, name, place: shown, at: kind === "you" ? at : jitter(at, name) });
   };
-  for (const p of peers) if (!p.isTarget) add("startup", p.name, p.country);
+  const sorted = [...peers].sort((a, b) => (b.fundingEur ?? -1) - (a.fundingEur ?? -1));
+  for (const p of sorted) add(p.isTarget ? "you" : "startup", p.name, p.country);
   for (const i of map?.investors.list ?? []) add("investor", i.name, i.country);
   for (const a of map?.acquirers ?? []) add("acquirer", a.name, a.country);
   return out;
@@ -315,8 +464,8 @@ function MapView({ map, rows }: { map: MarketMap; rows: RowEvents }) {
       {map.mode === "demo" && <div className="banner">Demo mode: no Cala key is set, so every company, investor and number below is fictional.</div>}
 
       <section className="overview" aria-labelledby="overview-h">
-        <p className="eyebrow">Market map</p>
-        <h1 id="overview-h">{map.input.idea ?? map.target?.name}</h1>
+        <p className="eyebrow">The report</p>
+        <h2 id="overview-h">What the data says</h2>
         <Summary text={map.summary} />
         <dl className="figures">
           <div><dt>Companies found</dt><dd>{found}</dd></div>
