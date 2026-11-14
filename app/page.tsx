@@ -5,12 +5,12 @@ import dynamic from "next/dynamic";
 import type { Acquirer, MarketMap, MoatSignal, Momentum, Peer, Source } from "@/lib/types";
 import { fmtEur } from "@/lib/util";
 import { centreOf, jitter, locate, type LonLat } from "@/lib/geo";
-import { Glyph, KIND_LABEL, type GlobeMarker, type MarkerKind } from "./Globe";
+import { Glyph, KIND_LABEL, type GlobeLink, type GlobeMarker, type MarkerKind } from "./Globe";
 
 // The globe measures the window and runs an animation loop, so it renders on the client only.
 const Globe = dynamic(() => import("./Globe"), { ssr: false, loading: () => <div className="globe" /> });
 
-const EXAMPLES = ["Carbon accounting for SMEs", "AI tools for dental clinics", "B2B payments for freelancers"];
+const EXAMPLES = ["AI agents for customer support", "Carbon accounting for SMEs", "AI tools for dental clinics", "B2B payments for freelancers"];
 const KINDS: MarkerKind[] = ["startup", "invention", "investor", "acquirer"];
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -25,6 +25,8 @@ export default function Home() {
   const [preview, setPreview] = useState<Peer[] | null>(null);
   const [err, setErr] = useState("");
   const [phase, setPhase] = useState<Phase>("rest");
+  const [active, setActive] = useState<string | undefined>();
+  const [pick, setPick] = useState<LonLat | undefined>();
   const loading = phase === "finding" || phase === "reading";
 
   async function run(i: string, c = company) {
@@ -33,6 +35,8 @@ export default function Home() {
     setErr("");
     setMap(null);
     setPreview(null);
+    setPick(undefined);
+    setActive(undefined);
     setPhase("finding");
     let gotPeers = false;
     try {
@@ -45,7 +49,7 @@ export default function Home() {
       const pdata = await pres.json();
       if (!pres.ok) throw new Error(pdata.error ?? "Something went wrong");
       if (pdata.stage !== "peers") {
-        setMap(pdata); // demo mode answers with the full map
+        setMap(pdata); // a saved or demo map answers with the full map
         setPhase("done");
         return;
       }
@@ -77,7 +81,8 @@ export default function Home() {
 
   const peers = map?.peers ?? preview ?? [];
   const markers = useMemo(() => buildMarkers(peers, map), [peers, map]);
-  const focus = useMemo<LonLat | undefined>(
+  const links = useMemo(() => buildLinks(markers, map), [markers, map]);
+  const home = useMemo<LonLat | undefined>(
     () => centreOf(markers.filter((m) => m.kind === "startup").map((m) => m.at)),
     [markers],
   );
@@ -85,7 +90,18 @@ export default function Home() {
     () => Object.fromEntries(KINDS.map((k) => [k, markers.filter((m) => m.kind === k).length])) as Record<MarkerKind, number>,
     [markers],
   );
+  const startups = peers.filter((p) => !p.isTarget).length;
   const atRest = phase === "rest";
+  const ids = useMemo(() => new Set(markers.map((m) => m.id)), [markers]);
+
+  /** A row below was hovered or focused: light its marker and arcs. */
+  const hover = (kind: MarkerKind, name?: string) => setActive(name && ids.has(`${kind}:${name}`) ? `${kind}:${name}` : undefined);
+  /** A row below was clicked: turn the globe to its marker. */
+  const show = (kind: MarkerKind, name: string) => {
+    const m = markers.find((x) => x.id === `${kind}:${name}`);
+    if (m) setPick([m.at[0], m.at[1]]);
+  };
+  const rows: RowEvents = { hover, show, active };
 
   function select(m: GlobeMarker) {
     const el = document.getElementById(anchor(m.kind, m.name));
@@ -104,67 +120,99 @@ export default function Home() {
     setPreview(null);
     setPhase("rest");
     setErr("");
+    setActive(undefined);
   }
+
+  const form = (compact: boolean) => (
+    <form className={`search${compact ? " compact" : ""}`} role="search" onSubmit={(e) => { e.preventDefault(); run(idea); }}>
+      <label className="field idea">
+        <span className="sr-only">Your idea</span>
+        <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder={compact ? "Map another idea" : "Your idea, e.g. payroll for restaurants"} />
+      </label>
+      {!compact && (
+        <label className="field company">
+          <span className="sr-only">Your company, optional</span>
+          <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Your company (optional)" />
+        </label>
+      )}
+      <button className="go" disabled={loading}>{loading ? "Mapping" : compact ? "Map" : "Map my market"}</button>
+    </form>
+  );
 
   return (
     <>
-      <header className="bar">
-        <a className="wordmark" href="/" onClick={(e) => { e.preventDefault(); reset(); }}>Market Navigator</a>
-        <span className="bar-note">Built on Cala's company graph</span>
+      <header className={`bar${atRest ? "" : " docked"}`}>
+        <a className="wordmark" href="/" onClick={(e) => { e.preventDefault(); reset(); }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden><circle cx="9" cy="9" r="7.25" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M1.75 9h14.5M9 1.75c2.2 2 3.1 4.4 3.1 7.25S11.2 14.25 9 16.25M9 1.75C6.8 3.75 5.9 6.15 5.9 9S6.8 14.25 9 16.25" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
+          Market Navigator
+        </a>
+        {!atRest && form(true)}
+        <span className="bar-note">Built on Cala&rsquo;s company graph</span>
       </header>
 
-      <section className={`stage ${atRest ? "at-rest" : "has-map"}`} aria-label="Search and globe">
-        <Globe markers={markers} focus={focus} spin={atRest || phase === "finding"} onSelect={select} />
-
-        <div className="nav">
-          {atRest && (
-            <>
-              <h1>Who's already building your idea?</h1>
-              <p className="lede">Describe it in one line. The startups doing it light up on the globe, with their funding, backers and buyers, every fact sourced.</p>
-            </>
-          )}
-          <form className="search" onSubmit={(e) => { e.preventDefault(); run(idea); }}>
-            <label className="field idea">
-              <span className="sr-only">Your idea</span>
-              <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Your idea, e.g. payroll software for restaurants" />
-            </label>
-            <label className="field company">
-              <span className="sr-only">Your company, optional</span>
-              <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Your company (optional)" />
-            </label>
-            <button className="go" disabled={loading}>{loading ? "Mapping" : "Map my market"}</button>
-          </form>
-          {atRest && (
-            <div className="examples">
-              {EXAMPLES.map((x) => <button key={x} type="button" onClick={() => run(x, "")}>{x}</button>)}
+      <div className={`stage ${atRest ? "at-rest" : "has-map"}`}>
+        <aside className="sky" aria-label="Globe of the companies found">
+          <Globe
+            markers={markers}
+            links={links}
+            active={active}
+            labels={!atRest}
+            focus={pick ?? home}
+            spin={atRest || phase === "finding"}
+            onSelect={select}
+            onHover={setActive}
+          />
+          {!atRest && (
+            <div className="key">
+              <ul className="legend" aria-label="Legend">
+                {KINDS.filter((k) => k !== "invention" || counts.invention > 0).map((k) => (
+                  <li key={k} className={counts[k] ? "" : "none"}>
+                    <Glyph kind={k} />
+                    {KIND_LABEL[k]}s <span className="count">{counts[k]}</span>
+                  </li>
+                ))}
+              </ul>
+              {startups > counts.startup && <p className="key-note">{startups - counts.startup} of {startups} startups have no known HQ, so they are listed but not placed.</p>}
             </div>
           )}
-          {!atRest && <Status phase={phase} found={peers.length} err={err} />}
-          {atRest && err && <p className="status error" role="alert">{err}</p>}
-        </div>
+        </aside>
 
-        {!atRest && (
-          <ul className="legend" aria-label="Legend">
-            {KINDS.map((k) => (
-              <li key={k} className={counts[k] ? "" : "none"}>
-                <Glyph kind={k} />
-                {KIND_LABEL[k]}s <span className="count">{counts[k]}</span>
-              </li>
-            ))}
-          </ul>
+        {atRest ? (
+          <section className="nav" aria-labelledby="hero-h">
+            <h1 id="hero-h">Who&rsquo;s already building your idea?</h1>
+            <p className="lede">Describe it in one line. The startups doing it light up on the globe, with who funded them and who bought their rivals. Every fact links to its source.</p>
+            {form(false)}
+            <div className="examples">
+              <span className="examples-h">Try</span>
+              {EXAMPLES.map((x) => <button key={x} type="button" onClick={() => run(x, "")}>{x}</button>)}
+            </div>
+            {err && <p className="status error" role="alert">{err}</p>}
+          </section>
+        ) : (
+          <div className="feed">
+            <Status phase={phase} found={peers.length} err={err} />
+            {preview && !map && <PeersPreview peers={preview} rows={rows} />}
+            {map && <MapView map={map} rows={rows} />}
+            <footer className="foot">
+              <span>Company, funding, investor and deal data from Cala. Amounts in EUR at approximate rates.</span>
+            </footer>
+          </div>
         )}
-      </section>
-
-      {preview && !map && <PeersPreview peers={preview} />}
-      {map && <MapView map={map} />}
-
-      <footer className="foot">
-        <span className="foot-name">Market Navigator</span>
-        <span>Company, funding, investor and deal data from Cala. Amounts in EUR at approximate rates.</span>
-      </footer>
+      </div>
     </>
   );
 }
+
+type RowEvents = { hover: (kind: MarkerKind, name?: string) => void; show: (kind: MarkerKind, name: string) => void; active?: string };
+/** Hover, focus and click wiring for a row that has a marker on the globe. */
+const rowProps = (r: RowEvents, kind: MarkerKind, name: string) => ({
+  onMouseEnter: () => r.hover(kind, name),
+  onMouseLeave: () => r.hover(kind),
+  onFocus: () => r.hover(kind, name),
+  onBlur: () => r.hover(kind),
+  onClick: () => r.show(kind, name),
+  "data-on": r.active === `${kind}:${name}` || undefined,
+});
 
 function Status({ phase, found, err }: { phase: Phase; found: number; err: string }) {
   if (err) return <p className="status error" role="alert">{err}</p>;
@@ -189,18 +237,33 @@ function buildMarkers(peers: Peer[], map: MarketMap | null): GlobeMarker[] {
   return out;
 }
 
-function PeersPreview({ peers }: { peers: Peer[] }) {
+/** Investor to each startup it backed; acquirer to each startup its evidence names. */
+function buildLinks(markers: GlobeMarker[], map: MarketMap | null): GlobeLink[] {
+  if (!map) return [];
+  const at = new Map(markers.map((m) => [m.id, m.at]));
+  const out: GlobeLink[] = [];
+  const link = (kind: "investor" | "acquirer", from: string, peer: string) => {
+    const a = at.get(`${kind}:${from}`), b = at.get(`startup:${peer}`);
+    if (a && b) out.push({ id: `${kind}:${from}>${peer}`, kind, from: a, to: b, ends: [`${kind}:${from}`, `startup:${peer}`] });
+  };
+  for (const i of map.investors.list) for (const p of i.peers) link("investor", i.name, p);
+  for (const a of map.acquirers)
+    for (const p of map.peers) if (a.evidence.some((e) => e.text.includes(p.name))) link("acquirer", a.name, p.name);
+  return out;
+}
+
+function PeersPreview({ peers, rows }: { peers: Peer[]; rows: RowEvents }) {
   return (
     <main className="results">
-      <section className="panel wide" aria-labelledby="peers-h">
-        <h2 id="peers-h">Who's already doing this</h2>
-        <PeerTable peers={peers} />
+      <section className="panel" aria-labelledby="peers-h">
+        <h2 id="peers-h"><span className="step">1</span>Who&rsquo;s already doing this</h2>
+        <PeerTable peers={peers} rows={rows} />
       </section>
     </main>
   );
 }
 
-function PeerTable({ peers, showShare = false }: { peers: Peer[]; showShare?: boolean }) {
+function PeerTable({ peers, rows, showShare = false }: { peers: Peer[]; rows: RowEvents; showShare?: boolean }) {
   const maxShare = Math.max(...peers.map((p) => p.share ?? 0), 0.0001);
   return (
     <div className="scroll">
@@ -211,12 +274,12 @@ function PeerTable({ peers, showShare = false }: { peers: Peer[]; showShare?: bo
             <th className="num">Raised</th>
             {showShare && <th className="share-h">Share of capital</th>}
             <th>Last round</th>
-            <th>HQ</th>
+            <th className="hq">HQ</th>
           </tr>
         </thead>
         <tbody>
           {peers.map((p) => (
-            <tr key={p.name} id={p.isTarget ? undefined : anchor("startup", p.name)} tabIndex={-1} className={p.isTarget ? "target" : ""}>
+            <tr key={p.name} id={p.isTarget ? undefined : anchor("startup", p.name)} tabIndex={-1} className={p.isTarget ? "target" : ""} {...(p.isTarget ? {} : rowProps(rows, "startup", p.name))}>
               <td>
                 <div className="name">
                   {!p.isTarget && <Glyph kind="startup" />}
@@ -235,7 +298,7 @@ function PeerTable({ peers, showShare = false }: { peers: Peer[]; showShare?: bo
                 </td>
               )}
               <td>{p.lastRound ?? "–"}</td>
-              <td>{p.country ?? "–"}</td>
+              <td className="hq">{p.country ?? "–"}</td>
             </tr>
           ))}
         </tbody>
@@ -244,7 +307,7 @@ function PeerTable({ peers, showShare = false }: { peers: Peer[]; showShare?: bo
   );
 }
 
-function MapView({ map }: { map: MarketMap }) {
+function MapView({ map, rows }: { map: MarketMap; rows: RowEvents }) {
   const target = map.peers.find((p) => p.isTarget);
   const found = map.peers.filter((p) => !p.isTarget).length;
   return (
@@ -252,8 +315,9 @@ function MapView({ map }: { map: MarketMap }) {
       {map.mode === "demo" && <div className="banner">Demo mode: no Cala key is set, so every company, investor and number below is fictional.</div>}
 
       <section className="overview" aria-labelledby="overview-h">
+        <p className="eyebrow">Market map</p>
         <h1 id="overview-h">{map.input.idea ?? map.target?.name}</h1>
-        <p className="summary">{map.summary}</p>
+        <Summary text={map.summary} />
         <dl className="figures">
           <div><dt>Companies found</dt><dd>{found}</dd></div>
           <div><dt>Known capital raised</dt><dd>{fmtEur(map.capital.totalEur)}</dd></div>
@@ -266,26 +330,26 @@ function MapView({ map }: { map: MarketMap }) {
         </dl>
       </section>
 
-      <section className="panel wide" aria-labelledby="peers-h">
-        <h2 id="peers-h">Who's already doing this</h2>
-        <PeerTable peers={map.peers} showShare />
+      <section className="panel" aria-labelledby="peers-h">
+        <h2 id="peers-h"><span className="step">1</span>Who&rsquo;s already doing this</h2>
+        <PeerTable peers={map.peers} rows={rows} showShare />
         <p className="note">Share of capital is each company's share of the money raised across this set. Revenue isn't public for private companies, so this is the proxy.</p>
       </section>
 
       <div className="pair">
         <section className="panel" aria-labelledby="money-h">
-          <h2 id="money-h">Is money flowing in?</h2>
+          <h2 id="money-h"><span className="step">2</span>Is money flowing in?</h2>
           <MomentumView m={map.momentum} />
         </section>
 
         <section className="panel" aria-labelledby="inv-h">
-          <h2 id="inv-h">Who invests here</h2>
+          <h2 id="inv-h"><span className="step">3</span>Who invests here</h2>
           {map.investors.list.length === 0 ? (
             <p className="note">Cala lists no investors for these companies yet.</p>
           ) : (
             <ul className="rows">
               {map.investors.list.slice(0, 8).map((i) => (
-                <li key={i.name} id={anchor("investor", i.name)} tabIndex={-1}>
+                <li key={i.name} id={anchor("investor", i.name)} tabIndex={-1} {...rowProps(rows, "investor", i.name)}>
                   <div className="name"><Glyph kind="investor" /><span>{i.name}</span><Sources sources={i.sources} /></div>
                   <div className="desc">Backed {i.peers.join(", ")}{i.country ? ` · ${i.country}` : ""}</div>
                 </li>
@@ -297,7 +361,7 @@ function MapView({ map }: { map: MarketMap }) {
 
       <div className="pair">
         <section className="panel" aria-labelledby="gap-h">
-          <h2 id="gap-h">Where you can stand out</h2>
+          <h2 id="gap-h"><span className="step">4</span>Where you can stand out</h2>
           <div className="gaps">
             {map.standout.gaps.map((g, i) => (
               <article key={i}>
@@ -317,11 +381,11 @@ function MapView({ map }: { map: MarketMap }) {
         </section>
 
         <section className="panel" aria-labelledby="acq-h">
-          <h2 id="acq-h">How companies here end</h2>
+          <h2 id="acq-h"><span className="step">5</span>How companies here end</h2>
           {map.acquirers.length === 0 ? (
             <p className="note">Cala shows no acquisitions around these companies yet.</p>
           ) : (
-            <ul className="rows">{map.acquirers.map((a) => <AcquirerRow key={a.name} a={a} max={map.acquirers[0].score} />)}</ul>
+            <ul className="rows">{map.acquirers.map((a) => <AcquirerRow key={a.name} a={a} rows={rows} />)}</ul>
           )}
         </section>
       </div>
@@ -396,17 +460,30 @@ function PositionRow({ m }: { m: MoatSignal }) {
   );
 }
 
-function AcquirerRow({ a, max }: { a: Acquirer; max: number }) {
+function AcquirerRow({ a, rows }: { a: Acquirer; rows: RowEvents }) {
   return (
-    <li id={anchor("acquirer", a.name)} tabIndex={-1}>
+    <li id={anchor("acquirer", a.name)} tabIndex={-1} {...rowProps(rows, "acquirer", a.name)}>
       <div className="name">
         <Glyph kind="acquirer" />
         <span>{a.name}</span>
-        <span className="strength" role="img" aria-label={`Evidence score ${a.score} of ${max}`}><i style={{ width: `${(a.score / max) * 100}%` }} /></span>
       </div>
       <ul className="evidence">{a.evidence.slice(0, 4).map((e, i) => <li key={i}>{e.text}<Sources sources={e.sources} /></li>)}</ul>
       {a.country && <div className="desc">{a.country}</div>}
     </li>
+  );
+}
+
+/** The summary, two sentences at first; the rest one click away. */
+function Summary({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const parts = text.split(/(?<=[.!?])\s+(?=[A-Z"“])/);
+  const short = parts.slice(0, 2).join(" ");
+  const more = parts.length > 2;
+  return (
+    <p className="summary">
+      {open || !more ? text : short}
+      {more && <> <button type="button" className="more" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Show less" : "Read all"}</button></>}
+    </p>
   );
 }
 

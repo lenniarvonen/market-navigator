@@ -12,7 +12,7 @@ export async function writeSummary(map: MarketMap): Promise<string> {
       idea: map.input.idea,
       company: map.target?.name,
       industry: map.industry,
-      peers: map.peers.map((p) => ({ name: p.name, isFounder: p.isTarget, funding: p.fundingEur, lastRound: p.lastRound, country: p.country })),
+      peers: map.peers.map((p) => ({ name: p.name, isFounder: p.isTarget, funding: p.fundingEur ? fmtEur(p.fundingEur) : undefined, lastRound: p.lastRound, country: p.country })),
       momentum: { roundsPerYear: map.momentum.years, trend: map.momentum.trend, earlyShare: map.momentum.earlyShare, crowding: map.momentum.crowding },
       earlyInvestors: map.investors.list.slice(0, 5).map((i) => ({ name: i.name, backed: i.peers })),
       gaps: map.standout.gaps.map((g) => g.title),
@@ -23,10 +23,10 @@ export async function writeSummary(map: MarketMap): Promise<string> {
       max_tokens: 2000,
       output_config: { effort: "low" },
       system:
-        "You advise a founder who is still validating an idea. Write 4 to 6 plain sentences, with no headings or bullet points. " +
-        "Use only the facts in the JSON and never invent numbers or companies. Cover: how crowded the space is and who leads it, " +
-        "whether money is flowing in (and at which stage), which early investors are active, and whether there is a visible exit path. " +
-        "End with one concrete validation step for this week. If data is missing, say what is missing rather than guessing.",
+        "You advise a founder who is still validating an idea. Write exactly 3 short, plain sentences (60 words at most), with no headings or bullet points. Write money the way the JSON does (e.g. €1.2B), never as long digits. " +
+        "Use only the facts in the JSON and never invent numbers or companies. Sentence 1: how crowded the space is and who leads it. " +
+        "Sentence 2: whether money is flowing in and whether there is a visible exit. Sentence 3: one concrete validation step for this week. " +
+        "Do not comment on data quality.",
       messages: [{ role: "user", content: JSON.stringify(compact) }],
     });
     if (res.stop_reason === "refusal") return templateSummary(map);

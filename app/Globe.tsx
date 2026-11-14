@@ -4,11 +4,13 @@
 // the markers are the only colour on it. Drag (or arrow keys) to turn it; it turns slowly on its
 // own at rest unless the visitor prefers reduced motion.
 import { useEffect, useRef } from "react";
-import { geoDistance, geoOrthographic, geoPath } from "d3-geo";
+import { geoDistance, geoGraticule10, geoOrthographic, geoPath } from "d3-geo";
 import { LAND, type LonLat } from "@/lib/geo";
 
 export type MarkerKind = "startup" | "invention" | "investor" | "acquirer";
 export type GlobeMarker = { id: string; kind: MarkerKind; name: string; place?: string; at: LonLat };
+/** A connection drawn as a great-circle arc: an investor to a startup it backed, a buyer to a startup it bought. */
+export type GlobeLink = { id: string; kind: "investor" | "acquirer"; from: LonLat; to: LonLat; ends: [string, string] };
 
 export const KIND_LABEL: Record<MarkerKind, string> = {
   startup: "Startup",
@@ -34,22 +36,31 @@ export function Glyph({ kind, size = 14 }: { kind: MarkerKind; size?: number }) 
 
 type Props = {
   markers: GlobeMarker[];
+  links?: GlobeLink[];
+  /** Marker id to light up (a hovered row below), plus its links. */
+  active?: string;
+  /** Show startup names next to their markers. */
+  labels?: boolean;
   /** Turn the globe to this point (changes when a new map arrives). */
   focus?: LonLat;
   /** Slow turn at rest. */
   spin: boolean;
   onSelect?: (m: GlobeMarker) => void;
+  /** A marker was hovered or focused (undefined when it is left). */
+  onHover?: (id?: string) => void;
 };
 
 const SPIN_DEG_PER_MS = 0.004;
 const FLY_MS = 1400;
 
-export default function Globe({ markers, focus, spin, onSelect }: Props) {
+export default function Globe({ markers, links = [], active, labels = false, focus, spin, onSelect, onHover }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const sea = useRef<SVGCircleElement>(null);
   const land = useRef<SVGPathElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const pins = useRef(new Map<string, HTMLButtonElement>());
+  const arcs = useRef(new Map<string, SVGPathElement>());
+  const grid = useRef<SVGPathElement>(null);
   const st = useRef({
     rot: [-15, -35, 0] as [number, number, number], // starts over the Nordics
     size: 0,
@@ -61,9 +72,11 @@ export default function Globe({ markers, focus, spin, onSelect }: Props) {
     reduced: false,
     spin,
     markers,
+    links,
   });
   st.current.spin = spin;
   st.current.markers = markers;
+  st.current.links = links;
   st.current.dirty = true;
 
   // Fly to a new focus point.
@@ -92,6 +105,7 @@ export default function Globe({ markers, focus, spin, onSelect }: Props) {
 
     const projection = geoOrthographic().clipAngle(90).precision(0.4);
     const path = geoPath(projection);
+    const graticule = geoGraticule10();
 
     const ro = new ResizeObserver(([e]) => {
       s.size = e.contentRect.width;
@@ -122,7 +136,10 @@ export default function Globe({ markers, focus, spin, onSelect }: Props) {
         sea.current?.setAttribute("cx", String(r));
         sea.current?.setAttribute("cy", String(r));
         land.current?.setAttribute("d", path(LAND as Parameters<typeof path>[0]) ?? "");
+        grid.current?.setAttribute("d", path(graticule) ?? "");
+        for (const l of s.links) arcs.current.get(l.id)?.setAttribute("d", path({ type: "LineString", coordinates: [l.from, l.to] }) ?? "");
         const centre: [number, number] = [-s.rot[0], -s.rot[1]];
+        const boxes: [number, number, number][] = []; // shown labels: x, y, width
         for (const m of s.markers) {
           const el = pins.current.get(m.id);
           if (!el) continue;
@@ -134,6 +151,14 @@ export default function Globe({ markers, focus, spin, onSelect }: Props) {
           }
           el.style.visibility = "visible";
           el.style.transform = `translate(${p[0]}px, ${p[1]}px)`;
+          // Names that would overlap an earlier (better funded) name are hidden; the tooltip still has them.
+          const label = el.querySelector<HTMLElement>(".label");
+          if (label) {
+            const w = m.name.length * 7.5 + 12;
+            const clash = boxes.some(([x, y, bw]) => Math.abs(y - p[1]) < 18 && p[0] < x + bw && x < p[0] + w);
+            label.classList.toggle("hidden", clash);
+            if (!clash) boxes.push([p[0], p[1], w]);
+          }
         }
       }
       raf = requestAnimationFrame(frame);
@@ -189,14 +214,25 @@ export default function Globe({ markers, focus, spin, onSelect }: Props) {
         }}
       >
         <circle ref={sea} className="sea" />
+        <path ref={grid} className="graticule" />
         <path ref={land} className="land" />
+        {links.map((l) => (
+          <path
+            key={l.id}
+            className={`arc ${l.kind}${active && l.ends.includes(active) ? " on" : ""}${active && !l.ends.includes(active) ? " off" : ""}`}
+            ref={(el) => {
+              if (el) arcs.current.set(l.id, el);
+              else arcs.current.delete(l.id);
+            }}
+          />
+        ))}
       </svg>
       <div className="pins">
         {markers.map((m) => (
           <button
             key={m.id}
             type="button"
-            className={`pin ${m.kind}`}
+            className={`pin ${m.kind}${active === m.id ? " on" : ""}${labels && m.kind === "startup" ? " labelled" : ""}`}
             ref={(el) => {
               if (el) pins.current.set(m.id, el);
               else pins.current.delete(m.id);
@@ -204,8 +240,13 @@ export default function Globe({ markers, focus, spin, onSelect }: Props) {
             style={{ visibility: "hidden" }}
             aria-label={`${KIND_LABEL[m.kind]}: ${m.name}${m.place ? `, ${m.place}` : ""}`}
             onClick={() => onSelect?.(m)}
+            onMouseEnter={() => onHover?.(m.id)}
+            onMouseLeave={() => onHover?.(undefined)}
+            onFocus={() => onHover?.(m.id)}
+            onBlur={() => onHover?.(undefined)}
           >
             <Glyph kind={m.kind} />
+            {labels && m.kind === "startup" && <span className="label" aria-hidden>{m.name}</span>}
             <span className="tip" role="presentation">
               {m.name}
               <small>{KIND_LABEL[m.kind]}{m.place ? ` · ${m.place}` : ""}</small>

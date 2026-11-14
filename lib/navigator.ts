@@ -4,6 +4,7 @@ import * as cala from "./cala";
 import type { Acquirer, Evidence, Investor, MarketMap, Momentum, MoatSignal, Peer, Round, Source } from "./types";
 import { field, median, norm, parseIntLoose, parseMoneyEur, pool } from "./util";
 import { demoMap } from "./demo";
+import { fixtureFor } from "./fixtures";
 import { writeSummary } from "./summary";
 import { findGaps } from "./standout";
 
@@ -167,6 +168,8 @@ export type PeersPreview = { stage: "peers"; input: MapInput; industry?: string;
 
 export async function buildPeersPreview(input: MapInput): Promise<PeersPreview | MarketMap> {
   if (!input.idea?.trim() && !input.company?.trim()) throw new Error("Describe your idea or name your company.");
+  const fx = fixtureFor(input.idea, input.company);
+  if (fx) return fx;
   if (!cala.hasCalaKey()) return demoMap(input);
   const warnings: string[] = [];
   const f = await findPeers(input, makeSoft(warnings), warnings);
@@ -176,6 +179,8 @@ export async function buildPeersPreview(input: MapInput): Promise<PeersPreview |
 export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
   const company = input.company?.trim() || undefined;
   if (!input.idea?.trim() && !company) throw new Error("Describe your idea or name your company.");
+  const fx = fixtureFor(input.idea, company);
+  if (fx) return fx;
   if (!cala.hasCalaKey()) return demoMap(input);
   const resultKey = `map v3 ${norm(input.idea ?? "")} ${norm(company ?? "")}`;
   const cached = await cala.readCachedResult<MarketMap>(resultKey);

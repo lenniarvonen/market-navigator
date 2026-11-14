@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildMarketMap, buildPeersPreview } from "@/lib/navigator";
+import { cleanMap } from "@/lib/clean";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   if (!idea && !company) return NextResponse.json({ error: "Describe your idea (?idea=...) or name your company (?company=...)." }, { status: 400 });
   try {
     if (sp.get("stage") === "peers") return NextResponse.json(await buildPeersPreview({ idea, company }));
-    return NextResponse.json(await buildMarketMap({ idea, company }));
+    return NextResponse.json(cleanMap(await buildMarketMap({ idea, company })));
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
   }

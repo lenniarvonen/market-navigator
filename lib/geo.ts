@@ -27,7 +27,7 @@ const PLACES: Record<string, LonLat> = {
   // small countries and territories
   singapore: [103.8, 1.35], "hong kong": [114.17, 22.32], luxembourg: [6.13, 49.61], malta: [14.5, 35.9],
   monaco: [7.42, 43.74], liechtenstein: [9.55, 47.14], bahrain: [50.56, 26.07], mauritius: [57.55, -20.3],
-  "cayman islands": [-81.25, 19.31], bermuda: [-64.75, 32.3], andorra: [1.52, 42.51], gibraltar: [-5.35, 36.14],
+  "cayman islands": [-81.25, 19.31], seychelles: [55.45, -4.62], "london city of": [-0.09, 51.515], "greater london": [-0.12, 51.51], bermuda: [-64.75, 32.3], andorra: [1.52, 42.51], gibraltar: [-5.35, 36.14],
   // United States
   california: [-119.4, 36.8], "san francisco": [-122.42, 37.77], "new york": [-74.0, 40.71], massachusetts: [-71.4, 42.3],
   boston: [-71.06, 42.36], texas: [-99.0, 31.0], austin: [-97.74, 30.27], washington: [-120.7, 47.4], seattle: [-122.33, 47.61],
