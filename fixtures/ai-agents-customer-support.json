@@ -1,0 +1,971 @@
+{
+  "input": {
+    "idea": "AI agents for customer support"
+  },
+  "mode": "live",
+  "industry": "AI agents for customer support",
+  "peers": [
+    {
+      "id": "93bfd6e7-a6a5-474e-b088-382c69966eb3",
+      "name": "Sierra",
+      "via": [
+        "similar-search",
+        "industry"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "fundingEur": 1196000000,
+      "fundingLabel": "~$1.3B+ (incl. $950M in May 2026)",
+      "foundedYear": 2023,
+      "lastRound": "Series",
+      "country": "United States",
+      "description": "Conversational AI platform for enterprise customer experience",
+      "rounds": [
+        {
+          "type": "Seed",
+          "amountEur": 101200000,
+          "year": 2024,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Sierra funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series A",
+          "amountEur": 161000000,
+          "year": 2024,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Sierra funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series B (Series D per some sources)",
+          "amountEur": 322000000,
+          "year": 2025,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Sierra funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series E",
+          "amountEur": 874000000,
+          "year": 2026,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Sierra funding rounds"
+            }
+          ]
+        }
+      ],
+      "share": 0.562381034781104
+    },
+    {
+      "id": "cef96540-2781-4203-8e52-c7b57bd6910d",
+      "name": "Decagon",
+      "via": [
+        "similar-search",
+        "industry"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "fundingEur": 414000000,
+      "fundingLabel": "~$450M+",
+      "foundedYear": 2023,
+      "lastRound": "Series D",
+      "country": "United States",
+      "description": "Software and services company headquartered in San Francisco, United States.",
+      "rounds": [],
+      "share": 0.19467035819345907
+    },
+    {
+      "id": "2d18527f-f81a-44ef-afef-37c5f0c8da59",
+      "name": "Ada",
+      "via": [
+        "similar-search",
+        "industry"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "fundingEur": 184000000,
+      "fundingLabel": "~$200M",
+      "foundedYear": 2016,
+      "lastRound": "Series C",
+      "country": "Hauts-de-Seine",
+      "description": "A French company headquartered in Clichy, founded in 1986.",
+      "rounds": [
+        {
+          "type": "Seed",
+          "amountEur": 1840000,
+          "year": 2017,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Ada funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series A",
+          "amountEur": 13064000,
+          "year": 2018,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Ada funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series B",
+          "amountEur": 40480000,
+          "year": 2020,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Ada funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series C",
+          "amountEur": 119600000,
+          "year": 2021,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Ada funding rounds"
+            }
+          ]
+        }
+      ],
+      "share": 0.08652015919709292
+    },
+    {
+      "id": "20fcda88-c968-47ee-875e-94501302cf27",
+      "name": "Cognigy",
+      "via": [
+        "similar-search",
+        "industry"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "fundingEur": 151800000,
+      "fundingLabel": "~$165M (acquired)",
+      "foundedYear": 2016,
+      "lastRound": "Series C",
+      "country": "Germany",
+      "description": "German AI customer‑service software company founded in 2016 and headquartered in Düsseldorf.",
+      "rounds": [
+        {
+          "type": "Series A",
+          "amountEur": 5500000,
+          "year": 2019,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Cognigy funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series B",
+          "amountEur": 40480000,
+          "year": 2021,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Cognigy funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series B extension",
+          "amountEur": 13800000,
+          "year": 2022,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Cognigy funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series C",
+          "amountEur": 92000000,
+          "year": 2024,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Cognigy funding rounds"
+            }
+          ]
+        }
+      ],
+      "share": 0.07137913133760167
+    },
+    {
+      "id": "e8f78fbd-b373-4ea6-865d-4d3f5497b9a4",
+      "name": "Notch",
+      "via": [
+        "similar-search"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "description": null,
+      "rounds": [
+        {
+          "type": "Series A",
+          "amountEur": 27600000,
+          "year": 2026,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Notch funding rounds"
+            }
+          ]
+        }
+      ],
+      "fundingEur": 27600000,
+      "fundingLabel": "1 round(s)",
+      "lastRound": "Series A",
+      "share": 0.012978023879563939
+    },
+    {
+      "id": "a0e317f9-1938-43fb-a17c-5c6af583c899",
+      "name": "Forethought",
+      "via": [
+        "similar-search"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "description": "a generative AI startup specializing in customer support automation",
+      "rounds": []
+    },
+    {
+      "id": "9fe1deaf-12b5-4675-aefd-669a3628438f",
+      "name": "GigaML",
+      "via": [
+        "similar-search"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "description": "A technology company that provides network traffic visibility and analytics solutions.",
+      "rounds": [
+        {
+          "type": "Seed",
+          "amountEur": 3312000,
+          "year": 2023,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: GigaML funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series A",
+          "amountEur": 56120000,
+          "year": 2025,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: GigaML funding rounds"
+            }
+          ]
+        }
+      ],
+      "fundingEur": 59432000,
+      "fundingLabel": "2 round(s)",
+      "lastRound": "Series A",
+      "share": 0.027946011420661013
+    },
+    {
+      "id": "02104726-8ee1-4d0e-9a6a-5c317b9a164b",
+      "name": "Yellow.ai",
+      "via": [
+        "similar-search"
+      ],
+      "sources": [
+        {
+          "name": "How Notch ships action-taking AI agents safely in regulated customer support - Microsoft for Startups Blog",
+          "url": "https://www.microsoft.com/en-us/startups/blog/how-notch-ships-action-taking-ai-agents-safely-in-regulated-customer-support"
+        },
+        {
+          "name": "Top startups in Native AI in Customer Support in India (Jan, 2026) - Tracxn",
+          "url": "https://tracxn.com/d/explore/native-ai-in-customer-support-startups-in-india/__c2MlpT5beTZ3Yx1owfTzzeSlzPMaZPgqRQRehsw7eY8/companies"
+        },
+        {
+          "name": "AI Agents Startups/SMEs Companies Assessment, 2026",
+          "url": "https://www.360quadrants.com/software/ai-agents-startups"
+        },
+        {
+          "name": "The Top 20 AI Agents Startups by Revenue in 2024The Top 20 AI Agents Startups by Revenue - Thorsten Meyer AI",
+          "url": "https://thorstenmeyerai.com/insights/top-ai-agents-startups-by-revenue"
+        },
+        {
+          "name": "Giga: AI Customer Support Agents for B2C Companies | AI Chopping Block",
+          "url": "https://www.choppingblock.ai/companies/gigaml"
+        },
+        {
+          "name": "Customer service AI startup Decagon raises $131 million | Reuters",
+          "url": "https://www.reuters.com/technology/customer-service-ai-startup-decagon-raises-131-million-2025-06-23?ref=biztoc.com"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        },
+        {
+          "name": "Cala: companies in AI agents for customer support"
+        }
+      ],
+      "country": "India",
+      "description": "Software and services company founded by Raghu Ravinutala, Jaya Kishore Reddy Gollareddy, and Rashid Khan.",
+      "rounds": [
+        {
+          "type": "Series A",
+          "amountEur": 3680000,
+          "year": 2019,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Yellow.ai funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series B",
+          "amountEur": 18400000,
+          "year": 2020,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Yellow.ai funding rounds"
+            }
+          ]
+        },
+        {
+          "type": "Series C",
+          "amountEur": 71760000,
+          "year": 2021,
+          "investors": [],
+          "sources": [
+            {
+              "name": "Cala: Yellow.ai funding rounds"
+            }
+          ]
+        }
+      ],
+      "fundingEur": 93840000,
+      "fundingLabel": "3 round(s)",
+      "lastRound": "Series C",
+      "share": 0.04412528119051739
+    }
+  ],
+  "capital": {
+    "totalEur": 2126672000,
+    "peersWithFunding": 7,
+    "top3Share": 0.8435715521716559
+  },
+  "momentum": {
+    "years": [
+      {
+        "year": 2022,
+        "rounds": 1,
+        "capitalEur": 13800000,
+        "early": 0,
+        "later": 1
+      },
+      {
+        "year": 2023,
+        "rounds": 1,
+        "capitalEur": 3312000,
+        "early": 1,
+        "later": 0
+      },
+      {
+        "year": 2024,
+        "rounds": 3,
+        "capitalEur": 354200000,
+        "early": 1,
+        "later": 2
+      },
+      {
+        "year": 2025,
+        "rounds": 2,
+        "capitalEur": 378120000,
+        "early": 0,
+        "later": 2
+      },
+      {
+        "year": 2026,
+        "rounds": 2,
+        "capitalEur": 901600000,
+        "early": 0,
+        "later": 2
+      }
+    ],
+    "trend": "rising",
+    "earlyShare": 0.2222222222222222,
+    "top3Share": 0.8435715521716559,
+    "crowding": "crowded",
+    "sources": [
+      {
+        "name": "Cala: funding rounds of peers"
+      }
+    ]
+  },
+  "investors": {
+    "available": true,
+    "list": [
+      {
+        "id": "1acb5b99-d33d-43c8-8949-19b7ff6a9a6b",
+        "name": "DN CAPITAL - GLOBAL VENTURE CAPITAL V SCSP",
+        "rounds": 2,
+        "peers": [
+          "Cognigy"
+        ],
+        "sources": [
+          {
+            "name": "Cognigy",
+            "date": "2021-01-01",
+            "url": "https://www.dncapital.com/cognigy"
+          },
+          {
+            "name": "Cognigy Acquired by NiCE for $955 million – Europe’s Largest Ever AI Exit. - DN CAPITAL",
+            "date": "2025-08-05",
+            "url": "https://www.dncapital.com/blog/cognigy-acquired-by-nice-for-955-million-europes-largest-ever-ai-exit/"
+          },
+          {
+            "name": "DN CAPITAL",
+            "date": "2026-06-04",
+            "url": "https://www.dncapital.com/blog"
+          }
+        ],
+        "country": "Luxembourg"
+      },
+      {
+        "id": "e522dc0b-a8cb-4476-826b-e238a6d79ecc",
+        "name": "Benchmark",
+        "rounds": 1,
+        "peers": [
+          "Sierra"
+        ],
+        "sources": [
+          {
+            "name": "Exclusive: Ex-Salesforce co-CEO Bret Taylor and longtime Googler Clay Bavor raised $110 million to bring AI ‘agents’ to business | Fortune",
+            "date": "2024-02-13",
+            "url": "https://fortune.com/2024/02/13/bret-taylor-clay-bavor-ai-startup-sierra-110-million-funding-sequoia-benchmark"
+          },
+          {
+            "name": "BREAKING: Benchmark's AI Playbook",
+            "date": "2026-06-30",
+            "url": "https://www.sourcery.vc/p/breaking-benchmarks-ai-playbook"
+          }
+        ]
+      },
+      {
+        "id": "04672e18-3814-494b-8e41-956f65fbff05",
+        "name": "Forerunner Ventures",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "tracxn.com",
+            "date": "2026-08-25",
+            "url": "https://tracxn.com/d/companies/decagon/__olYF07yDINmnEYN1sXz7oaGNvyUoHt9yehLP3T7iuYc/funding-and-investors"
+          },
+          {
+            "name": "news.crunchbase.com",
+            "date": "2026-08-25",
+            "url": "https://news.crunchbase.com/venture/biggest-funding-rounds-ai-thinking-machines-abridge"
+          }
+        ]
+      },
+      {
+        "id": "1ef8729d-750a-40b0-a4e5-ea66eff2b853",
+        "name": "Starwood Capital Group",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "tracxn.com",
+            "date": "2026-08-25",
+            "url": "https://tracxn.com/d/companies/decagon/__olYF07yDINmnEYN1sXz7oaGNvyUoHt9yehLP3T7iuYc/funding-and-investors"
+          },
+          {
+            "name": "news.crunchbase.com",
+            "date": "2026-08-25",
+            "url": "https://news.crunchbase.com/venture/biggest-funding-rounds-ricursive-intelligence-cellares-ai-funding"
+          }
+        ]
+      },
+      {
+        "id": "413fea6f-ff5b-4a38-a93f-984a8261320f",
+        "name": "Bain Capital Ventures",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "tracxn.com",
+            "date": "2026-08-25",
+            "url": "https://tracxn.com/d/companies/decagon/__olYF07yDINmnEYN1sXz7oaGNvyUoHt9yehLP3T7iuYc/funding-and-investors"
+          }
+        ]
+      },
+      {
+        "id": "4a7ccd5d-1310-46b0-bd42-4ff8b409acc5",
+        "name": "Index Ventures",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "tracxn.com",
+            "date": "2026-08-25",
+            "url": "https://tracxn.com/d/companies/decagon/__olYF07yDINmnEYN1sXz7oaGNvyUoHt9yehLP3T7iuYc/funding-and-investors"
+          },
+          {
+            "name": "news.crunchbase.com",
+            "date": "2026-08-25",
+            "url": "https://news.crunchbase.com/venture/biggest-funding-rounds-ricursive-intelligence-cellares-ai-funding"
+          }
+        ]
+      },
+      {
+        "id": "5c1f642b-a668-4bd0-ab15-2db23d23dbf6",
+        "name": "Index Ventures Limited",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "Index Ventures: Companies | Index Ventures",
+            "date": "2026-01-01",
+            "url": "https://www.indexventures.com/companies"
+          },
+          {
+            "name": "Index Ventures: Martin Mignot | Index Ventures",
+            "date": "2026-01-01",
+            "url": "https://www.indexventures.com/team/martin-mignot"
+          }
+        ],
+        "country": "Seychelles"
+      },
+      {
+        "id": "71458374-77cc-414e-ad66-6395395a2c02",
+        "name": "INDEX VENTURES (UK) LLP",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "Index Ventures: Companies | Index Ventures",
+            "date": "2026-01-01",
+            "url": "https://www.indexventures.com/companies"
+          },
+          {
+            "name": "startupfundraising.com",
+            "date": "2026-08-25",
+            "url": "https://startupfundraising.com/research/firm/index-ventures/portfolio-companies-2026"
+          }
+        ],
+        "country": "London, City of"
+      },
+      {
+        "id": "8836abc3-c200-4b1f-a195-61c5985a0b6a",
+        "name": "Bond Capital",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "tracxn.com",
+            "date": "2026-08-25",
+            "url": "https://tracxn.com/d/companies/decagon/__olYF07yDINmnEYN1sXz7oaGNvyUoHt9yehLP3T7iuYc/funding-and-investors"
+          }
+        ]
+      },
+      {
+        "id": "9cdae40e-e11a-4584-bc9d-650a78be3008",
+        "name": "Osaühing T-Capital",
+        "rounds": 1,
+        "peers": [
+          "Decagon"
+        ],
+        "sources": [
+          {
+            "name": "tracxn.com",
+            "date": "2026-08-25",
+            "url": "https://tracxn.com/d/companies/decagon/__olYF07yDINmnEYN1sXz7oaGNvyUoHt9yehLP3T7iuYc/funding-and-investors"
+          }
+        ]
+      }
+    ]
+  },
+  "standout": {
+    "gaps": [
+      {
+        "title": "Enterprise focus leaves smaller businesses underserved",
+        "detail": "Sierra explicitly targets enterprise customer experience, and the most heavily funded players (Sierra at €1.2B, Decagon at €414.0M) appear built for large accounts. The facts don't say who most peers sell to, so whether SMBs are truly underserved still needs validation.",
+        "peers": [
+          "Sierra",
+          "Decagon",
+          "Cognigy",
+          "Yellow.ai"
+        ]
+      },
+      {
+        "title": "Capital concentrated in late-stage US players",
+        "detail": "Sierra and Decagon, both US-based and founded in 2023, hold the largest funding, and Decagon is at Series D. A newcomer could avoid a head-on fight by targeting a region or niche these well-funded generalists are less focused on.",
+        "peers": [
+          "Sierra",
+          "Decagon",
+          "Ada",
+          "Cognigy",
+          "Yellow.ai"
+        ]
+      },
+      {
+        "title": "Vertical or niche specialization is unclear",
+        "detail": "Descriptions are generic ('customer support automation', 'conversational AI platform'), and some data is unreliable or missing: GigaML's description mentions network analytics, Notch has no description, and Ada's record conflicts with itself. No peer clearly owns a specific industry vertical, though that is unconfirmed.",
+        "peers": [
+          "Forethought",
+          "Notch",
+          "GigaML",
+          "Ada",
+          "Sierra"
+        ]
+      }
+    ],
+    "position": [],
+    "generatedBy": "claude"
+  },
+  "acquirers": [
+    {
+      "id": "da128610-608c-402a-a498-5d0315206499",
+      "name": "GROUPE ROUSSELET",
+      "score": 3,
+      "evidence": [
+        {
+          "kind": "owns_peer",
+          "text": "Owns Ada (since 1992-02)",
+          "sources": [
+            {
+              "name": "GLEIF",
+              "date": "2026-04-08",
+              "url": "https://search.gleif.org/#/record/9695001NADA53SXLP505"
+            }
+          ]
+        }
+      ],
+      "country": "Hauts-de-Seine"
+    },
+    {
+      "id": "f27999a6-e08a-4f88-8db5-f5a60aa866fc",
+      "name": "NICE Ltd.",
+      "score": 3,
+      "evidence": [
+        {
+          "kind": "deal_with_peer",
+          "text": "Acquired Cognigy (2025-09)",
+          "sources": [
+            {
+              "name": "NiCE Closes Acquisition of Cognigy, Transforming Customer Experience with Data-Driven CX AI",
+              "date": "2025-09-08",
+              "url": "https://www.cognigy.com/news/nice-closes-acquisition-of-cognigy"
+            },
+            {
+              "name": "NiCE Closes Acquisition of Cognigy | NiCE",
+              "date": "2025-09-08",
+              "url": "https://www.nice.com/press-releases/nice-closes-acquisition-of-cognigy-transforming-customer-experience-with-best-in-class-data-driven-cx-ai-platform"
+            },
+            {
+              "name": "NiCE Completes $955 Million Cognigy Acquisition",
+              "date": "2021-06-01",
+              "url": "https://www.callcentrehelper.com/nice-announced-completion-cognigy-acquisition-263100.htm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": "This space is crowded and led by Sierra (1,196,000,000 in total funding, though its last round stage is listed only as \"Series\") and Decagon (414,000,000, Series D), followed by Ada, Cognigy, and Yellow.ai, while Forethought has no funding data at all. Capital is rising sharply, from €13.8M in 2022 to €901.6M in 2026, but only about 22% of rounds were early-stage, with no early rounds in 2025 or 2026, so the money is concentrating in late-stage US players. On the early side, Benchmark backed Sierra, Forerunner Ventures, Starwood Capital Group, and Bain Capital Ventures backed Decagon, and DN Capital backed Cognigy, but each backed only one company here, so none shows a clear thesis you could pitch into. There is one credible exit signal, NICE Ltd. acquiring Cognigy in September 2025, while the record of Groupe Rousselet \"owning Ada since 1992\" looks like a data mismatch and shouldn't be counted. This week, use the gaps around underserved smaller businesses and unclear vertical specialization by picking one vertical and interviewing ten small-business support leads about what they use today and what they would pay to replace it.",
+  "warnings": [],
+  "generatedAt": "2026-11-14T22:17:20.140Z"
+}

@@ -36,12 +36,13 @@ export function demoMap(input: MapInput): MarketMap {
 
   const momentum = buildMomentum(peers, top3Share);
   momentum.sources = DEMO;
-  const inv = new Map<string, { name: string; rounds: number; peers: string[]; sources: Source[] }>();
+  const HQ: Record<string, string> = { "Polar Seed Fund": "Finland", "Halo Ventures": "United Kingdom", "Ostra Capital": "Sweden", "Northern Angels": "Finland", "Kettu VC": "Finland", "Baltic Founders Club": "Estonia", "Fjell Partners": "Norway" };
+  const inv = new Map<string, { name: string; country?: string; rounds: number; peers: string[]; sources: Source[] }>();
   for (const p of peers)
     for (const x of p.rounds ?? []) {
       if (!/seed/i.test(x.type ?? "")) continue;
       for (const n of x.investors) {
-        const v = inv.get(n) ?? { name: n, rounds: 0, peers: [], sources: DEMO };
+        const v = inv.get(n) ?? { name: n, country: HQ[n], rounds: 0, peers: [], sources: DEMO };
         v.rounds++;
         if (!v.peers.includes(p.name)) v.peers.push(p.name);
         inv.set(n, v);
@@ -58,16 +59,16 @@ export function demoMap(input: MapInput): MarketMap {
     investors: { available: true, list: [...inv.values()].sort((a, b) => b.peers.length - a.peers.length || b.rounds - a.rounds) },
     standout: { gaps: templateGaps(peers), position: [], generatedBy: "template" },
     acquirers: [
-      { name: "NorthBank Software Group", score: 8, evidence: [
+      { name: "NorthBank Software Group", country: "Denmark", score: 8, evidence: [
         { kind: "owns_peer", text: "Owns Klimaregnskap (since 2024-03)", sources: DEMO },
         { kind: "deal_with_peer", text: "Deal with Emitrace: minority stake, 2025", sources: DEMO },
         { kind: "sector_deal", text: "Cited as an acquirer in carbon accounting software", sources: DEMO },
       ] },
-      { name: "Fjord ERP", score: 4, evidence: [
+      { name: "Fjord ERP", country: "Norway", score: 4, evidence: [
         { kind: "deal_with_peer", text: "Deal with Footprint Labs: acquisition talks reported, 2025", sources: DEMO },
         { kind: "deal_with_peer", text: "Deal with Scope3 Studio: strategic partnership, 2024", sources: DEMO },
       ] },
-      { name: "Baltic Audit Partners", score: 2, evidence: [{ kind: "deal_with_peer", text: "Deal with GreenBooks AI: acquisition, 2026", sources: DEMO }] },
+      { name: "Baltic Audit Partners", country: "Latvia", score: 2, evidence: [{ kind: "deal_with_peer", text: "Deal with GreenBooks AI: acquisition, 2026", sources: DEMO }] },
     ],
     summary: "",
     warnings: ["Demo mode: no CALA_API_KEY is set, so every company, investor and number shown is fictional."],

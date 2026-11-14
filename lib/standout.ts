@@ -16,8 +16,9 @@ export async function findGaps(args: {
   const { idea, industry, peers, soft } = args;
 
   // Founder backgrounds for the best-funded peers (one sourced question each).
-  const top = [...peers].sort((a, b) => (b.fundingEur ?? 0) - (a.fundingEur ?? 0)).slice(0, 4);
-  const teams = await pool(top, 4, async (p) => {
+  // Only Claude reads these, and each is a slow (~30 s) Cala search, so they are opt-in (CALA_DEEP=1).
+  const top = process.env.ANTHROPIC_API_KEY && process.env.CALA_DEEP === "1" ? [...peers].sort((a, b) => (b.fundingEur ?? 0) - (a.fundingEur ?? 0)).slice(0, 3) : [];
+  const teams = await pool(top, 3, async (p) => {
     const r = await soft(
       `Team of ${p.name}`,
       cala.search(`Who founded ${p.name} and where did they work before?`),

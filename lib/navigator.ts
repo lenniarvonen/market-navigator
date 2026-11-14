@@ -7,38 +7,78 @@ import { demoMap } from "./demo";
 import { writeSummary } from "./summary";
 import { findGaps } from "./standout";
 
-const MAX_PEERS = 15;
+const MAX_PEERS = 8; // each peer costs ~3 Cala calls, and Cala allows roughly one call per 1.5 s
 const PARENT_IN = ["IS_DIRECT_PARENT_OF", "IS_ULTIMATE_PARENT_OF"];
 const PARENT_OUT = ["IS_SUBSIDIARY_OF"];
 const EVENTS_OUT = ["PARTICIPATES_IN_CORPORATE_EVENT"];
+const INVESTORS_IN = ["INVESTED_IN"];
+const MAX_DEAL_LOOKUPS = 6;
 const YEARS = 5;
 const EARLY = /pre[- ]?seed|seed|angel|grant/i;
+// Cala names corporate events by type: MNA_COMPLETED, MNA_ANNOUNCED, FINANCING_RAISED_OR_FACILITY_ENTERED, ...
+const DEAL = /\bmna\b|mna_|acqui|merg|takeover|buyout|purchase|stake/i;
+// Search answers name banks, funds and investors next to the startups; keep those out of the peer set.
+const NOT_A_PEER = /\b(ventures?|capital|partners|bank|banking|fund|funds|investments?|investors?|asset management|holdings|private equity|growth equity|vc)\b|\b(hsbc|nasdaq|blackrock|goldman sachs|fidelity|jpmorgan|y combinator)\b/i;
+const PEER_TYPES = new Set(["Company", "Organization"]);
 
 export type MapInput = { idea?: string; company?: string };
 type Soft = <T>(label: string, p: Promise<T>, fallback: T) => Promise<T>;
 const EMPTY_SEARCH: cala.SearchResult = { content: "", context: [], entities: [] };
 const EMPTY_QUERY: cala.QueryResult = { results: [], entities: [] };
 
-export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
-  const idea = input.idea?.trim() || undefined;
-  const company = input.company?.trim() || undefined;
-  if (!idea && !company) throw new Error("Describe your idea or name your company.");
-  if (!cala.hasCalaKey()) return demoMap(input);
+/** Startup names from a search answer: the bold lead of each bullet ("- **Greenly** (Paris) — ..."). */
+function boldNames(content: string): string[] {
+  const out: string[] = [];
+  for (const m of content.matchAll(/^\s*(?:[-*]|\d+\.)\s+\*\*([^*]{2,60})\*\*/gm)) {
+    const name = m[1].replace(/\s*\(.*\)\s*$/, "").replace(/[:,.]$/, "").trim();
+    if (name && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
 
-  const warnings: string[] = [];
-  const soft: Soft = async (label, p, fallback) => {
+/** Map a name to an entity from the same response, via its name or its mentions. */
+function idIn(entities: cala.EntityRef[], name: string): string | undefined {
+  const k = norm(name);
+  return entities.find((e) => PEER_TYPES.has(e.entity_type) && (norm(e.name) === k || (e.mentions ?? []).some((m) => norm(m) === k)))?.id;
+}
+
+const humanIndustry = (code?: string) => (code && /^[A-Z0-9_]+$/.test(code) ? code.toLowerCase().replace(/_/g, " ") : code);
+
+const DEEP = process.env.CALA_DEEP === "1"; // opt-in: sector-acquirer search (+1 slow knowledge call)
+const MAX_ROUNDS_PER_PEER = 6;
+
+type Found = {
+  idea?: string;
+  target?: cala.Entity;
+  topic?: string;
+  industry?: string;
+  peerList: Peer[];
+};
+
+function makeSoft(warnings: string[]): Soft {
+  return async (label, p, fallback) => {
     try {
       return await p;
     } catch (e) {
-      warnings.push(`${label}: ${(e as Error).message.slice(0, 160)}`);
+      const msg = (e as Error).message;
+      warnings.push(
+        /-> 429/.test(msg) ? `${label}: Cala rate limit, skipped` : /abort|timeout/i.test(msg) ? `${label}: Cala timed out, skipped` : `${label}: ${msg.slice(0, 160)}`,
+      );
       return fallback;
     }
   };
+}
 
-  // 1. The founder's company, if they gave one and Cala knows it.
+/** Stage 1 (fast-ish): who is already doing this. Two slow Cala calls at most, both disk-cached. */
+/** Stage 1. `full` also runs the topic query when search already found enough peers, but only to fill in their funding. */
+export async function findPeers(input: MapInput, soft: Soft, warnings: string[], full = false): Promise<Found> {
+  const idea = input.idea?.trim() || undefined;
+  const company = input.company?.trim() || undefined;
+
+  // The founder's company, if they gave one and Cala knows it.
   let target: cala.Entity | undefined;
   if (company) {
-    const hit = (await soft("Find your company", cala.searchEntities(company, ["Company"], 3), []))[0];
+    const hit = (await soft("Find your company", cala.searchEntities(company, ["Company", "Organization"], 3), []))[0];
     if (hit) {
       target = await soft(
         "Retrieve your company",
@@ -50,13 +90,17 @@ export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
       );
     } else warnings.push(`Cala doesn't know "${company}" yet, so the map is built from your idea only.`);
   }
+  const targetIndustry = target?.relationships.outgoing.OPERATES_IN_INDUSTRY?.[0]?.name;
+  // Cala's industry codes (SOFTWARE_AND_SERVICES) are too coarse to find peers, so the
+  // structured query takes the idea as free text: "companies.industry=carbon accounting for SMEs".
+  const topic = idea ?? target?.description?.split(/[.;]/)[0]?.slice(0, 120) ?? humanIndustry(targetIndustry);
+  const industry = idea ?? humanIndustry(targetIndustry);
 
-  // 2. Seed companies: similar to the idea, and direct competitors of the founder's company.
   const peers = new Map<string, Peer>();
   const targetKey = target ? norm(target.name) : "";
   const addPeer = (p: Peer) => {
     const k = norm(p.name);
-    if (!k || k === targetKey) return;
+    if (!k || k === targetKey || NOT_A_PEER.test(p.name)) return;
     const e = peers.get(k);
     if (!e) return void peers.set(k, p);
     e.via = [...new Set([...e.via, ...p.via])];
@@ -69,79 +113,93 @@ export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
     e.sources.push(...p.sources);
   };
 
+  // a) Startups named in a sourced search answer (the bold lead of each bullet).
   const [similar, competitors] = await Promise.all([
     idea ? soft("Similar companies", cala.search(`Which startups and companies are building ${idea}?`), EMPTY_SEARCH) : EMPTY_SEARCH,
     target ? soft("Competitor search", cala.search(`Who are the main direct competitors of ${target.name}?`), EMPTY_SEARCH) : EMPTY_SEARCH,
   ]);
   for (const [res, via] of [[similar, "similar-search"], [competitors, "competitor-search"]] as const) {
     const srcs = cala.knowBitSources(res.context);
-    for (const e of res.entities) if (e.entity_type === "Company") addPeer({ id: e.id, name: e.name, via: [via], sources: srcs });
+    const named = boldNames(res.content);
+    if (named.length) for (const name of named) addPeer({ id: idIn(res.entities, name), name, via: [via], sources: srcs });
+    else for (const e of res.entities) if (PEER_TYPES.has(e.entity_type)) addPeer({ id: e.id, name: e.name, via: [via], sources: srcs });
   }
 
-  // 3. Industry: the founder's company's, else the most common one among the closest matches.
-  let industry = target?.relationships.outgoing.OPERATES_IN_INDUSTRY?.[0]?.name;
-  if (!industry) {
-    const firsts = [...peers.values()].filter((p) => p.id).slice(0, 4);
-    const inds = await pool(firsts, 4, (p) =>
-      soft(`Industry of ${p.name}`, cala.retrieve(p.id!, { outgoing: ["OPERATES_IN_INDUSTRY"], limit: 3 }), undefined),
-    );
-    const counts = new Map<string, number>();
-    for (const e of inds) for (const r of e?.relationships.outgoing.OPERATES_IN_INDUSTRY ?? []) counts.set(r.name, (counts.get(r.name) ?? 0) + 1);
-    industry = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  }
-  if (!industry) warnings.push("Cala lists no industry for these companies, so the peer set comes from search only.");
-
-  // 4. Industry peers (structured query) on top of the search results.
-  if (industry) {
+  // b) Structured query on the topic: adds peers and their funding totals and stages. When search already
+  //    found enough peers, the preview skips it (one slow call less) and the full map uses it for funding only.
+  const enough = peers.size >= MAX_PEERS;
+  if (topic && (!enough || full)) {
     const rows = await soft(
       "Industry peers",
       cala.query(
-        `companies.industry=${industry}.founded_year>=${new Date().getFullYear() - 12} return(name, total_funding, last_funding_round, employee_count, founded_year) order_by=total_funding DESC limit=25`,
+        `companies.industry=${topic}.founded_year>=${new Date().getFullYear() - 12} return(name, total_funding, last_funding_round, employee_count, founded_year) order_by=total_funding DESC limit=15`,
       ),
       EMPTY_QUERY,
     );
-    const ids = new Map(rows.entities.map((e) => [norm(e.name), e.id]));
     for (const row of rows.results) {
       const name = String(field(row, "name", "company", "company_name") ?? "");
       if (!name) continue;
+      if (enough && !peers.has(norm(name))) continue;
       const funding = field(row, "total_funding", "funding", "funding_amount", "total_raised");
       addPeer({
-        id: ids.get(norm(name)),
+        id: idIn(rows.entities, name),
         name,
         foundedYear: parseIntLoose(field(row, "founded_year", "founding_year", "year")),
         employees: parseIntLoose(field(row, "employee_count", "employees")),
         fundingEur: parseMoneyEur(funding),
         fundingLabel: funding ? String(funding) : undefined,
-        lastRound: (field(row, "last_funding_round", "round_type", "last_round") as string) ?? undefined,
+        lastRound: lastRoundType(field(row, "last_funding_round", "round_type", "last_round")),
         via: ["industry"],
-        sources: [cala.calaSource(`companies in ${industry}`)],
+        sources: [cala.calaSource(`companies in ${topic}`)],
       });
     }
   }
 
-  // Closest matches first (found by search), then by funding.
+  // Found by both search and query first, then search-only (closest to the idea), then by funding.
   const peerList = [...peers.values()]
-    .sort((a, b) => Number(b.via.includes("industry") === false) - Number(a.via.includes("industry") === false) || b.via.length - a.via.length || (b.fundingEur ?? 0) - (a.fundingEur ?? 0))
+    .sort((a, b) => b.via.length - a.via.length || Number(a.via.includes("industry")) - Number(b.via.includes("industry")) || (b.fundingEur ?? 0) - (a.fundingEur ?? 0))
     .slice(0, MAX_PEERS);
   if (!peerList.length) throw new Error("Cala found no companies close to this idea. Try describing it with the customer and the product, e.g. \"payroll software for restaurants\".");
+  return { idea, target, topic, industry, peerList };
+}
 
-  // 5. Enrich: entity data, HQ, ownership and corporate events, plus dated funding rounds.
-  const enriched = await pool(peerList, 5, async (p) => {
-    if (!p.id) p.id = (await soft(`Resolve ${p.name}`, cala.searchEntities(p.name, ["Company"], 1), []))[0]?.id;
-    if (!p.id) return { peer: p, entity: undefined };
-    const [entity, rounds] = await Promise.all([
-      soft(
-        `Retrieve ${p.name}`,
-        cala.retrieve(p.id, {
-          properties: ["employee_count", "founding_date"],
-          outgoing: ["HAS_HEADQUARTERS_IN", ...EVENTS_OUT, ...PARENT_OUT],
-          incoming: PARENT_IN,
-          limit: 10,
-        }),
-        undefined,
-      ),
-      fundingRounds(p.name, soft),
-    ]);
+export type PeersPreview = { stage: "peers"; input: MapInput; industry?: string; peers: Peer[]; warnings: string[] };
+
+export async function buildPeersPreview(input: MapInput): Promise<PeersPreview | MarketMap> {
+  if (!input.idea?.trim() && !input.company?.trim()) throw new Error("Describe your idea or name your company.");
+  if (!cala.hasCalaKey()) return demoMap(input);
+  const warnings: string[] = [];
+  const f = await findPeers(input, makeSoft(warnings), warnings);
+  return { stage: "peers", input, industry: f.industry, peers: f.peerList, warnings: [...new Set(warnings)] };
+}
+
+export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
+  const company = input.company?.trim() || undefined;
+  if (!input.idea?.trim() && !company) throw new Error("Describe your idea or name your company.");
+  if (!cala.hasCalaKey()) return demoMap(input);
+  const resultKey = `map v3 ${norm(input.idea ?? "")} ${norm(company ?? "")}`;
+  const cached = await cala.readCachedResult<MarketMap>(resultKey);
+  if (cached) return cached;
+
+  const warnings: string[] = [];
+  const soft = makeSoft(warnings);
+  const { idea, target, topic, industry, peerList } = await findPeers(input, soft, warnings, true);
+
+  // Enrich, one retrieve per peer (fast entity reads): HQ, investors, ownership, corporate events and funding rounds.
+  const enriched = await pool(peerList, 4, async (p) => {
+    if (!p.id) p.id = bestMatch(await soft(`Resolve ${p.name}`, cala.searchEntities(p.name, ["Company", "Organization"], 3), []), p.name)?.id;
+    const entity = p.id
+      ? await soft(
+          `Retrieve ${p.name}`,
+          cala.retrieve(p.id, {
+            properties: ["employee_count", "founding_date"],
+            outgoing: ["HAS_HEADQUARTERS_IN", ...EVENTS_OUT, ...PARENT_OUT, ...ROUNDS_OUT],
+            incoming: [...PARENT_IN, ...INVESTORS_IN],
+            limit: 15,
+          }),
+          undefined,
+        )
+      : undefined;
     if (entity) {
       const emp = entity.properties.employee_count;
       if (p.employees === undefined && emp) {
@@ -152,23 +210,45 @@ export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
       if (p.foundedYear === undefined && fd) p.foundedYear = parseIntLoose(String(fd).slice(0, 4));
       p.country = entity.relationships.outgoing.HAS_HEADQUARTERS_IN?.[0]?.name;
       p.description ??= entity.description;
-    }
-    p.rounds = rounds;
-    if (rounds.length) {
-      const sum = rounds.reduce((s, r) => s + (r.amountEur ?? 0), 0);
-      if (p.fundingEur === undefined && sum) {
-        p.fundingEur = sum;
-        p.fundingLabel = `${rounds.length} round(s)`;
-      }
-      p.lastRound ??= [...rounds].sort((a, b) => (a.year ?? 0) - (b.year ?? 0)).at(-1)?.type;
+      p.rounds = await graphRounds(entity, soft);
     }
     return { peer: p, entity };
   });
 
+  // Peers the graph has no rounds for: one batched knowledge query (slow, so only when needed).
+  const missing = enriched.filter(({ peer }) => !peer.rounds?.length).map(({ peer }) => peer);
+  if (missing.length) {
+    const byName = await batchedRounds(missing.map((p) => p.name), soft);
+    for (const p of missing) p.rounds = byName.get(norm(p.name)) ?? [];
+  }
+  for (const { peer: p } of enriched) {
+    const rounds = p.rounds ?? [];
+    if (!rounds.length) continue;
+    const sum = rounds.reduce((s, r) => s + (r.amountEur ?? 0), 0);
+    if (p.fundingEur === undefined && sum) {
+      p.fundingEur = sum;
+      p.fundingLabel = `${rounds.length} round(s)`;
+    }
+    p.lastRound ??= [...rounds].sort((a, b) => (a.year ?? 0) - (b.year ?? 0)).at(-1)?.type;
+  }
+
+  // Anything that invested in a peer is an investor, not a peer.
+  const investorKeys = new Set(
+    enriched.flatMap(({ peer, entity }) => [
+      ...(entity?.relationships.incoming.INVESTED_IN ?? []).map((r) => norm(r.name)),
+      ...(peer.rounds ?? []).flatMap((r) => r.investors.map(norm)),
+    ]),
+  );
+  const kept = enriched.filter(({ peer }) => !investorKeys.has(norm(peer.name)));
+  const keptPeers = kept.map((e) => e.peer);
+
   // The founder's own company as a row, so they see themselves in the table.
-  const all: Peer[] = [...peerList];
+  const all: Peer[] = [...keptPeers];
   if (target) {
-    const rounds = await fundingRounds(target.name, soft);
+    const rounds = await graphRounds(
+      await soft("Your company's rounds", cala.retrieve(target.id, { outgoing: ROUNDS_OUT, limit: 15 }), target),
+      soft,
+    );
     const sum = rounds.reduce((s, r) => s + (r.amountEur ?? 0), 0);
     all.unshift({
       id: target.id,
@@ -179,27 +259,34 @@ export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
       foundedYear: parseIntLoose(String(target.properties.founding_date?.value ?? "").slice(0, 4)),
       fundingEur: sum || undefined,
       fundingLabel: rounds.length ? `${rounds.length} round(s)` : undefined,
-      lastRound: rounds.at(-1)?.type,
+      lastRound: [...rounds].sort((a, b) => (a.year ?? 0) - (b.year ?? 0)).at(-1)?.type,
       rounds,
       via: [],
       sources: [...cala.toSources(target.properties.employee_count?.sources), cala.calaSource(`${target.name} funding rounds`)],
     });
   }
 
-  // 6. Capital share and momentum.
+  // Capital share and momentum.
   const totalEur = all.reduce((s, p) => s + (p.fundingEur ?? 0), 0);
   for (const p of all) p.share = totalEur && p.fundingEur ? p.fundingEur / totalEur : undefined;
   const top3Share = all.map((p) => p.share ?? 0).sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
-  const momentum = buildMomentum(peerList, top3Share);
+  const momentum = buildMomentum(keptPeers, top3Share);
   if (!momentum.years.some((y) => y.rounds)) warnings.push("Cala returned no dated funding rounds for these peers, so the funding trend is empty.");
 
-  // 7. Early investors, gaps, founder position, acquirers.
-  const investors = buildInvestors(peerList);
+  // Investors, gaps, founder position, acquirers.
+  const investors = buildInvestors(kept);
   const [gaps, position, acquirers] = await Promise.all([
-    findGaps({ idea, industry, peers: peerList, soft }),
-    all[0]?.isTarget ? buildPosition(all[0], peerList) : Promise.resolve([] as MoatSignal[]),
-    buildAcquirers(enriched, target?.name, industry, soft),
+    findGaps({ idea, industry, peers: keptPeers, soft }),
+    all[0]?.isTarget ? buildPosition(all[0], keptPeers) : Promise.resolve([] as MoatSignal[]),
+    buildAcquirers(kept, target?.name, topic, soft),
   ]);
+
+  // HQ of the investors and acquirers, so the globe can place them (fast entity reads, cached).
+  const located = [...investors.slice(0, 8), ...acquirers].filter((x) => x.id);
+  await pool(located, 4, async (x) => {
+    const e = await soft(`HQ of ${x.name}`, cala.retrieve(x.id!, { outgoing: ["HAS_HEADQUARTERS_IN"], limit: 1 }), undefined);
+    x.country = e?.relationships.outgoing.HAS_HEADQUARTERS_IN?.[0]?.name;
+  });
 
   const map: MarketMap = {
     input: { idea, company },
@@ -209,38 +296,91 @@ export async function buildMarketMap(input: MapInput): Promise<MarketMap> {
     peers: all,
     capital: { totalEur, peersWithFunding: all.filter((p) => p.fundingEur).length, top3Share },
     momentum,
-    investors: { available: peerList.some((p) => p.rounds?.some((r) => r.investors.length)), list: investors },
+    investors: { available: investors.length > 0, list: investors },
     standout: { gaps: gaps.gaps, position, generatedBy: gaps.by },
     acquirers,
     summary: "",
-    warnings,
+    warnings: [...new Set(warnings)],
     generatedAt: new Date().toISOString(),
   };
   map.summary = await writeSummary(map);
+  // Cache complete maps only: a run where Cala calls were skipped should be retried next time.
+  if (!map.warnings.some((w) => /skipped|fetch failed|-> 5\d\d/.test(w))) await cala.writeCachedResult(resultKey, map);
   return map;
+}
+
+function bestMatch(hits: cala.EntityRef[], name: string): cala.EntityRef | undefined {
+  const k = norm(name);
+  const ok = hits.filter((h) => PEER_TYPES.has(h.entity_type) || !h.entity_type);
+  return ok.find((h) => norm(h.name) === k) ?? ok.find((h) => norm(h.name).startsWith(k)) ?? ok[0];
+}
+
+/** "Series C (Feb 2024, $100M) — valued at $1.8B" -> "Series C"; "Secondary market round; valued ..." -> "Secondary market round" */
+function lastRoundType(v: unknown): string | undefined {
+  if (typeof v !== "string" || !v.trim()) return undefined;
+  return v.split(/[;(—–]| - /)[0].trim() || undefined;
 }
 
 // ---------- Funding rounds ----------
 
-function asList(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map((x) => (typeof x === "string" ? x : String((x as { name?: string })?.name ?? ""))).filter(Boolean);
-  if (typeof v === "string") return v.split(/,|;| and /).map((s) => s.trim()).filter(Boolean);
-  return [];
-}
+const ROUNDS_OUT = ["PARTICIPATES_IN_FUNDING_ROUND"];
+const ROUND_PROPS = ["round_label", "transaction_value", "transaction_value_units", "announcement_date"];
+/** SERIES_C -> "Series C", PRE_SEED -> "Pre Seed" */
+const roundLabel = (v: unknown) =>
+  typeof v === "string" && v ? v.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : undefined;
 
-async function fundingRounds(name: string, soft: Soft): Promise<Round[]> {
-  const r = await soft(`Funding rounds for ${name}`, cala.query(`${name}.funding_rounds return(round_type, amount, date, investors)`), EMPTY_QUERY);
-  const src = [cala.calaSource(`${name} funding rounds`)];
-  return r.results.map((x) => {
-    const date = field(x, "date", "announced_date", "announced_on", "year");
+/** Funding rounds through the graph: FundingRound entities (fast reads) with stage, amount, date and investors. */
+async function graphRounds(entity: cala.Entity | undefined, soft: Soft): Promise<Round[]> {
+  const refs = (entity?.relationships.outgoing.PARTICIPATES_IN_FUNDING_ROUND ?? []).slice(0, MAX_ROUNDS_PER_PEER);
+  const rounds = await pool(refs, 3, async (ref): Promise<Round | undefined> => {
+    const r = await soft(
+      `Round ${ref.name} of ${entity!.name}`,
+      cala.retrieve(ref.id, { properties: ROUND_PROPS, incoming: ROUNDS_OUT, limit: 15 }),
+      undefined,
+    );
+    if (!r) return undefined;
+    const pr = r.properties;
+    const value = pr.transaction_value?.value;
+    const units = String(pr.transaction_value_units?.value ?? "EUR");
+    const date = String(pr.announcement_date?.value ?? ref.properties?.event_date ?? "");
     return {
-      type: (field(x, "round_type", "type", "funding_type", "stage") as string) ?? undefined,
-      amountEur: parseMoneyEur(field(x, "amount", "funding_amount", "money_raised", "amount_raised")),
-      year: parseIntLoose(String(date ?? "").match(/\d{4}/)?.[0]),
-      investors: asList(field(x, "investors", "lead_investors", "lead_investor", "participants")),
-      sources: src,
+      type: roundLabel(pr.round_label?.value) ?? ref.name,
+      amountEur: typeof value === "number" ? parseMoneyEur(`${units} ${value}`) : parseMoneyEur(value),
+      year: parseIntLoose(date.match(/\d{4}/)?.[0]),
+      investors: (r.relationships.incoming.PARTICIPATES_IN_FUNDING_ROUND ?? [])
+        .filter((x) => (x.properties?.role ?? "").toUpperCase() === "INVESTOR")
+        .map((x) => x.name),
+      sources: cala.toSources([...(pr.transaction_value?.sources ?? []), ...(ref.properties?.sources ?? [])]).slice(0, 3),
     };
   });
+  return rounds.filter((r) => r !== undefined);
+}
+
+/** One knowledge query for several companies' rounds (~40 s), used only for peers the graph has no rounds for. */
+async function batchedRounds(names: string[], soft: Soft): Promise<Map<string, Round[]>> {
+  const out = new Map<string, Round[]>();
+  if (!names.length) return out;
+  const r = await soft(
+    "Funding rounds (batch)",
+    cala.query(`companies.name=(${names.join(", ")}).funding_rounds return(company, round_type, amount, date)`),
+    EMPTY_QUERY,
+  );
+  for (const x of r.results) {
+    const company = String(field(x, "company", "name", "company_name") ?? (names.length === 1 ? names[0] : ""));
+    if (!company) continue;
+    const date = field(x, "date", "announced_date", "announced_on", "year");
+    const k = norm(company);
+    const list = out.get(k) ?? [];
+    list.push({
+      type: (field(x, "round_type", "round", "type", "stage") as string) ?? undefined,
+      amountEur: parseMoneyEur(field(x, "amount", "funding_amount", "money_raised", "amount_raised")),
+      year: parseIntLoose(String(date ?? "").match(/\d{4}/)?.[0]),
+      investors: [],
+      sources: [cala.calaSource(`${company} funding rounds`)],
+    });
+    out.set(k, list);
+  }
+  return out;
 }
 
 export function buildMomentum(peers: Peer[], top3Share: number): Momentum {
@@ -273,20 +413,17 @@ export function buildMomentum(peers: Peer[], top3Share: number): Momentum {
   };
 }
 
-function buildInvestors(peers: Peer[]): Investor[] {
+function buildInvestors(enriched: { peer: Peer; entity?: cala.Entity }[]): Investor[] {
   const m = new Map<string, Investor>();
-  for (const p of peers)
-    for (const r of p.rounds ?? []) {
-      if (r.type && !EARLY.test(r.type)) continue; // early-stage rounds only (or unknown type)
-      for (const name of r.investors) {
-        const k = norm(name);
-        if (!k) continue;
-        const inv = m.get(k) ?? { name, rounds: 0, peers: [], sources: [] };
-        inv.rounds++;
-        if (!inv.peers.includes(p.name)) inv.peers.push(p.name);
-        inv.sources.push(...r.sources);
-        m.set(k, inv);
-      }
+  for (const { peer, entity } of enriched)
+    for (const r of entity?.relationships.incoming.INVESTED_IN ?? []) {
+      const k = norm(r.name);
+      if (!k) continue;
+      const inv = m.get(k) ?? { id: r.id, name: r.name, rounds: 0, peers: [], sources: [] };
+      inv.rounds++;
+      if (!inv.peers.includes(peer.name)) inv.peers.push(peer.name);
+      inv.sources.push(...cala.toSources(r.properties?.sources).slice(0, 2));
+      m.set(k, inv);
     }
   return [...m.values()].sort((a, b) => b.peers.length - a.peers.length || b.rounds - a.rounds).slice(0, 10);
 }
@@ -313,7 +450,7 @@ async function buildPosition(t: Peer, peers: Peer[]): Promise<MoatSignal[]> {
 async function buildAcquirers(
   enriched: { peer: Peer; entity?: cala.Entity }[],
   targetName: string | undefined,
-  industry: string | undefined,
+  topic: string | undefined,
   soft: Soft,
 ): Promise<Acquirer[]> {
   const acq = new Map<string, Acquirer>();
@@ -342,29 +479,38 @@ async function buildAcquirers(
       });
   }
 
-  // b) Counterparties in the peers' corporate events (acquisitions, mergers, stakes).
-  const events = enriched.flatMap(({ peer, entity }) =>
-    (entity?.relationships.outgoing.PARTICIPATES_IN_CORPORATE_EVENT ?? []).slice(0, 5).map((ev) => ({ peer, ev })),
-  );
-  await pool(events.slice(0, 30), 5, async ({ peer, ev }) => {
-    const e = await soft(`Event ${ev.name}`, cala.retrieve(ev.id, { incoming: EVENTS_OUT, limit: 10 }), undefined);
-    if (!e) return;
-    const isDeal = /acqui|merg|takeover|buyout|purchase|stake/i.test(`${ev.name} ${e.description ?? ""}`);
-    for (const party of e.relationships.incoming.PARTICIPATES_IN_CORPORATE_EVENT ?? []) {
-      if (party.entity_type !== "Company") continue;
-      add(party.name, party.id, isDeal ? 2 : 0.5, {
+  // b) Who acquired a peer: MNA_* events where the peer was the target. The peer's side of the
+  //    event already carries its role, so only those events are looked up for the counterparty.
+  const deals = enriched
+    .flatMap(({ peer, entity }) =>
+      (entity?.relationships.outgoing.PARTICIPATES_IN_CORPORATE_EVENT ?? [])
+        .filter((ev) => DEAL.test(ev.name) && (ev.properties?.role ?? "TARGET").toUpperCase() !== "ACQUIRER")
+        .map((ev) => ({ peer, ev })),
+    )
+    .slice(0, MAX_DEAL_LOOKUPS);
+  await pool(deals, 3, async ({ peer, ev }) => {
+    const e = await soft(`Deal ${ev.name} for ${peer.name}`, cala.retrieve(ev.id, { incoming: EVENTS_OUT, limit: 10 }), undefined);
+    const when = ev.properties?.event_date?.slice(0, 7);
+    for (const party of e?.relationships.incoming.PARTICIPATES_IN_CORPORATE_EVENT ?? []) {
+      if (!PEER_TYPES.has(party.entity_type) || norm(party.name) === norm(peer.name)) continue;
+      const role = party.properties?.role?.toUpperCase();
+      if (role && role !== "ACQUIRER" && role !== "BUYER") continue;
+      add(party.name, party.id, 3, {
         kind: "deal_with_peer",
-        text: `${isDeal ? "Deal" : "Corporate event"} with ${peer.name}: ${ev.name}`,
+        text: `Acquired ${peer.name}${when ? ` (${when})` : ""}`,
         sources: cala.toSources(party.properties?.sources ?? ev.properties?.sources),
       });
     }
   });
 
   // c) Sector-level acquisitions Cala can cite.
-  if (industry) {
-    const s = await soft("Sector acquisitions", cala.search(`Which companies acquired startups in ${industry} in the last 5 years?`), EMPTY_SEARCH);
+  if (topic && DEEP) {
+    const s = await soft("Sector acquisitions", cala.search(`Which companies acquired ${topic} startups in the last 5 years?`), EMPTY_SEARCH);
     const srcs = cala.knowBitSources(s.context, 4);
-    for (const e of s.entities) if (e.entity_type === "Company") add(e.name, e.id, 1, { kind: "sector_deal", text: `Cited as an acquirer in ${industry}`, sources: srcs });
+    const named = new Set(boldNames(s.content).map(norm));
+    for (const e of s.entities)
+      if (PEER_TYPES.has(e.entity_type) && (!named.size || named.has(norm(e.name)) || (e.mentions ?? []).some((m) => named.has(norm(m)))))
+        add(e.name, e.id, 1, { kind: "sector_deal", text: `Cited as an acquirer in ${topic}`, sources: srcs });
   }
 
   return [...acq.values()].filter((a) => a.score >= 1).sort((a, b) => b.score - a.score).slice(0, 8);

@@ -36,7 +36,7 @@ export type Momentum = {
   sources: Source[];
 };
 
-export type Investor = { id?: string; name: string; rounds: number; peers: string[]; sources: Source[] };
+export type Investor = { id?: string; name: string; country?: string; rounds: number; peers: string[]; sources: Source[] };
 
 export type Gap = { title: string; detail: string; peers: string[] };
 
@@ -56,7 +56,7 @@ export type Evidence = {
   sources: Source[];
 };
 
-export type Acquirer = { id?: string; name: string; score: number; evidence: Evidence[] };
+export type Acquirer = { id?: string; name: string; country?: string; score: number; evidence: Evidence[] };
 
 export type MarketMap = {
   input: { idea?: string; company?: string };
